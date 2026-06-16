@@ -1412,10 +1412,27 @@ Requirements:
         seededAny = true;
       }
 
-      // Seed candidates if empty
+      // Load candidates from DB and merge with any stable local-only candidates
       if (dbCandidates && dbCandidates.length > 0) {
-        prevCandidatesRef.current = dbCandidates;
-        setCandidates(dbCandidates);
+        // Find any local stable candidates that are not yet in the DB (e.g. just uploaded)
+        const dbIds = new Set(dbCandidates.map(c => c.id));
+        const stableStatuses = ['ready', 'completed', 'failed'];
+        const localOnly = candidates
+          .filter(c => !dbIds.has(c.id) && stableStatuses.includes(c.status))
+          .map(sanitizeCandidate);
+
+        // Immediately persist any local-only stable candidates to DB
+        if (localOnly.length > 0) {
+          await supabase.from('candidates').upsert(localOnly);
+        }
+
+        // Merge: DB records + any local-only ones not yet in DB
+        const merged = [
+          ...dbCandidates,
+          ...candidates.filter(c => !dbIds.has(c.id))
+        ];
+        prevCandidatesRef.current = merged;
+        setCandidates(merged);
       } else {
         const sanitizedCandidates = candidates.map(sanitizeCandidate);
         const { error: err } = await supabase.from('candidates').upsert(sanitizedCandidates);
@@ -1486,13 +1503,11 @@ Requirements:
         const sanitizedCandidates = candidates.map(sanitizeCandidate);
         const prevSanitized = prev.map(sanitizeCandidate);
 
-        // Find deleted (if ID is completely removed from React state)
-        const deleted = prevSanitized.filter(p => !candidates.some(c => c.id === p.id));
-        for (const d of deleted) {
-          await supabase.from('candidates').delete().eq('id', d.id);
-        }
+        // NOTE: We do NOT delete from the DB when candidates are removed from local state.
+        // The DB is a permanent, append-only record of all candidates ever added.
+        // Removing from the local React view (e.g. "Clear All") should never wipe DB records.
 
-        // Find upserted (only include stable candidate states to prevent race condition updates)
+        // Only upsert candidates in stable states (avoid race conditions from transient reading/screening states)
         const stableSanitizedCandidates = sanitizedCandidates.filter(
           c => c.status !== 'reading' && c.status !== 'ocr_progress' && c.status !== 'screening'
         );
