@@ -267,6 +267,25 @@ a:hover {
   resize: vertical;
 }
 
+select {
+  background-color: var(--color-white);
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-body);
+  transition: var(--transition-smooth);
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-light);
+}
+
+select option {
+  background-color: var(--color-white) !important;
+  color: var(--color-ink) !important;
+}
+
 /* Dropzone (drag & drop) */
 .dropzone {
   border: 2px dashed var(--color-border);
