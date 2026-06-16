@@ -2716,14 +2716,25 @@ Requirements:
                   {candidate.fileName} • {extractEmail(candidate)}
                 </p>
               </div>
-              <button 
-                type="button" 
-                className="btn-close-drawer" 
-                onClick={() => setActiveDrawerCandidateId(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--color-ink)' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  className="btn-print-drawer btn-secondary"
+                  onClick={() => window.print()}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', height: '32px', border: '1px solid var(--color-border)', borderRadius: '4px', background: 'none', color: 'var(--color-ink-light)' }}
+                  title="Print candidate scorecard report or save as PDF"
+                >
+                  🖨️ Export PDF
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-close-drawer" 
+                  onClick={() => setActiveDrawerCandidateId(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: 'var(--color-ink)', padding: '0.25rem' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
             
             <div className="drawer-tabs" style={{ display: 'flex', gap: '0.50rem', borderBottom: '1px solid var(--color-border)', marginTop: '1rem', paddingBottom: '0.15rem' }}>
@@ -2774,9 +2785,35 @@ Requirements:
             {drawerActiveTab === 'overview' && (
               <div className="drawer-tab-panel animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', backgroundColor: 'var(--color-paper-light)' }}>
+                  <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', backgroundColor: 'var(--color-paper-light)' }}>
                     <span className="text-xs text-muted" style={{ textTransform: 'uppercase', fontWeight: '700' }}>Overall Score</span>
-                    <div style={{ fontSize: '2.25rem', fontWeight: '800', color: 'var(--color-terracotta)', fontFamily: 'var(--font-mono)' }}>{displayScore}</div>
+                    <div style={{ position: 'relative', width: '80px', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0.25rem 0' }}>
+                      <svg width="80" height="80" style={{ transform: 'rotate(-90deg)' }}>
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="32"
+                          stroke="var(--color-border)"
+                          strokeWidth="6"
+                          fill="transparent"
+                        />
+                        <circle
+                          cx="40"
+                          cy="40"
+                          r="32"
+                          stroke={(displayScore || 0) >= 80 ? 'var(--color-sage)' : (displayScore || 0) >= 70 ? 'var(--color-gold)' : 'var(--color-terracotta)'}
+                          strokeWidth="6"
+                          fill="transparent"
+                          strokeDasharray={2 * Math.PI * 32}
+                          strokeDashoffset={2 * Math.PI * 32 - (2 * Math.PI * 32 * (displayScore || 0)) / 100}
+                          strokeLinecap="round"
+                          style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
+                        />
+                      </svg>
+                      <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '1.45rem', fontWeight: '800', color: 'var(--color-ink)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{displayScore}</span>
+                      </div>
+                    </div>
                     <span className={`candidate-verdict ${outcome.badgeClass}`} style={{ fontSize: '0.65rem', padding: '0.15rem 0.45rem' }}>
                       {outcome.badge} Match
                     </span>
@@ -5460,7 +5497,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
       {/* 4. CANDIDATE COMPARISON MODAL */}
       {isCompareModalOpen && (() => {
-        const comparedCandidates = selectedCandidateIds.map(id => candidates.find(c => c.id === id)).filter(Boolean);
+        const comparedCandidates = selectedCandidateIds.map(id => enrichedCandidates.find(c => c.id === id)).filter(Boolean);
         const highestScore = Math.max(...comparedCandidates.map(c => c.score || 0));
         
         return (
@@ -5468,14 +5505,24 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <div className="modal-content comparison-modal" style={{ width: '950px', maxWidth: '95vw', height: '650px', maxHeight: '90vh' }}>
               <div className="modal-header">
                 <h3 className="modal-title">Candidate Comparison Dashboard</h3>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => setIsCompareModalOpen(false)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)' }}
-                >
-                  <X size={18} />
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn-primary btn-print-comparison"
+                    onClick={() => window.print()}
+                    style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', backgroundColor: 'var(--color-sage)', width: 'auto', display: 'flex', alignItems: 'center', gap: '0.25rem', height: '32px' }}
+                  >
+                    🖨️ Export PDF
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-close" 
+                    onClick={() => setIsCompareModalOpen(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)' }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
               
               <div className="modal-body scroll-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto', flex: 1 }}>
@@ -5502,318 +5549,291 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                       })}
                     </tr>
                   </thead>
-                <tbody>
-                  {/* Overall Score Row */}
-                  <tr style={{ backgroundColor: 'var(--color-paper-light)', fontWeight: 'bold', borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>Overall Alignment Score</td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      return (
-                        <td key={id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
-                          <span style={{ fontSize: '1.8rem', color: 'var(--color-terracotta)', fontFamily: 'var(--font-mono)' }}>{candidate.score}</span>
-                          <span style={{ fontSize: '0.8rem', display: 'block', color: 'var(--color-ink-muted)', fontWeight: 'normal' }}>out of 100</span>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  <tbody>
+                    {/* Overall Score Row */}
+                    <tr style={{ backgroundColor: 'var(--color-paper-light)', fontWeight: 'bold', borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>Overall Alignment Score</td>
+                      {comparedCandidates.map(candidate => {
+                        return (
+                          <td key={candidate.id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
+                            <span style={{ fontSize: '1.8rem', color: 'var(--color-terracotta)', fontFamily: 'var(--font-mono)' }}>{candidate.score}</span>
+                            <span style={{ fontSize: '0.8rem', display: 'block', color: 'var(--color-ink-muted)', fontWeight: 'normal' }}>out of 100</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Skills Score Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Skills Match (30%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Core tools and libraries alignment</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.skills || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Skills Score Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Skills Match (30%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Core tools and libraries alignment</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.skills || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Experience Score Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Experience & Tenure (25%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Years of work, senior titles match</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.experience || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Experience Score Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Experience & Tenure (25%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Years of work, senior titles match</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.experience || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Industry Match Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Industry Domain (10%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Fintech, SaaS, Healthcare background</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.industry || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Industry Match Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Industry Domain (10%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Fintech, SaaS, Healthcare background</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.industry || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Projects Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Projects & Execution (10%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>GitHub, scale, and delivery keywords</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.projects || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Projects Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Projects & Execution (10%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>GitHub, scale, and delivery keywords</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.projects || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Education Match Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Education Degree (5%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Academic alignment (BSc, Master, PhD)</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.education || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Education Match Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Education Degree (5%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Academic alignment (BSc, Master, PhD)</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.education || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Communication Match Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Communication & Clarity (10%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Use of action verbs, bullet density</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.communication || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Growth Indicators Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Growth & Leadership (10%)</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Mentoring, promotions, certifications</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const score = candidate.evaluation?.subscores?.growth || 75;
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem' }}>
+                            <div className="flex-col gap-1" style={{ display: 'flex' }}>
+                              <div className="flex justify-between text-xs font-semibold">
+                                <span>Score: {score}</span>
+                              </div>
+                              <div className="progress-bar-bg">
+                                <div className="progress-bar-fill" style={{ width: `${score}%` }} />
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Communication Match Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Communication & Clarity (10%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Use of action verbs, bullet density</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.communication || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
+                    {/* Location Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Location</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Current candidate location</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        return (
+                          <td key={candidate.id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
+                            <span style={{ fontWeight: '600' }}>{candidate.evaluation?.location || candidate.location || 'Bangalore'}</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Notice Period Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Notice Period</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Availability/joining timeline</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const np = candidate.evaluation?.notice_period || candidate.noticePeriod || 'Immediate';
+                        return (
+                          <td key={candidate.id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
+                            <span className="keyword-chip matched" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', display: 'inline-block' }}>
+                              {np}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Expected CTC Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Expected CTC</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Salary expectation in LPA</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        return (
+                          <td key={candidate.id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
+                            <span style={{ fontWeight: 'bold', color: 'var(--color-terracotta)', fontSize: '1.1rem' }}>
+                              {candidate.evaluation?.expected_ctc || candidate.expectedCtc || 0} LPA
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+
+                    {/* Scorecard Average Ratings Row */}
+                    <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Collaborator Reviews</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Averaged scorecard stars</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        const ratings = candidate.collaboratorRatings || {
+                          recruiter: candidate.scorecard || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 },
+                          technical: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 },
+                          hr: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 }
+                        };
+                        
+                        const avg = (role) => {
+                          const card = ratings[role] || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 };
+                          return ((card.technical + card.communication + card.problemSolving + card.cultureFit) / 4).toFixed(1);
+                        };
+                        
+                        return (
+                          <td key={candidate.id} style={{ padding: '1rem 0.5rem', fontSize: '0.8rem' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
+                              <span>Recruiter Screen: <strong>{avg('recruiter')} ★</strong></span>
+                              <span>Tech Interviewer: <strong>{avg('technical')} ★</strong></span>
+                              <span>HR Fit Round: <strong>{avg('hr')} ★</strong></span>
                             </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                          </td>
+                        );
+                      })}
+                    </tr>
 
-                  {/* Growth Indicators Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Growth & Leadership (10%)</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Mentoring, promotions, certifications</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const score = candidate.evaluation?.subscores?.growth || 75;
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem' }}>
-                          <div className="flex-col gap-1" style={{ display: 'flex' }}>
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span>Score: {score}</span>
-                            </div>
-                            <div className="progress-bar-bg">
-                              <div className="progress-bar-fill" style={{ width: `${score}%` }} />
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Location Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Location</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Current candidate location</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      return (
-                        <td key={id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
-                          <span style={{ fontWeight: '600' }}>{candidate.evaluation?.location || candidate.location || 'Bangalore'}</span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Notice Period Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Notice Period</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Availability/joining timeline</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      const np = candidate.evaluation?.notice_period || candidate.noticePeriod || 'Immediate';
-                      return (
-                        <td key={id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
-                          <span className="keyword-chip matched" style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', display: 'inline-block' }}>
-                            {np}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Expected CTC Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Expected CTC</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Salary expectation in LPA</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      return (
-                        <td key={id} style={{ textAlign: 'center', padding: '1rem 0.5rem' }}>
-                          <span style={{ fontWeight: 'bold', color: 'var(--color-terracotta)', fontSize: '1.1rem' }}>
-                            {candidate.evaluation?.expected_ctc || candidate.expectedCtc || 0} LPA
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Scorecard Average Ratings Row */}
-                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Collaborator Reviews</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Averaged scorecard stars</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      
-                      const ratings = candidate.collaboratorRatings || {
-                        recruiter: candidate.scorecard || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 },
-                        technical: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 },
-                        hr: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 }
-                      };
-                      
-                      const avg = (role) => {
-                        const card = ratings[role] || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3 };
-                        return ((card.technical + card.communication + card.problemSolving + card.cultureFit) / 4).toFixed(1);
-                      };
-                      
-                      return (
-                        <td key={id} style={{ padding: '1rem 0.5rem', fontSize: '0.8rem' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', alignItems: 'center' }}>
-                            <span>Recruiter Screen: <strong>{avg('recruiter')} ★</strong></span>
-                            <span>Tech Interviewer: <strong>{avg('technical')} ★</strong></span>
-                            <span>HR Fit Round: <strong>{avg('hr')} ★</strong></span>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-
-                  {/* Key Match Summary Phrases */}
-                  <tr style={{ backgroundColor: 'var(--color-paper-light)' }}>
-                    <td style={{ padding: '1rem 0.5rem' }}>
-                      <strong>Recruiter Summary</strong>
-                      <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Offline match engine overview</span>
-                    </td>
-                    {selectedCandidateIds.map(id => {
-                      const candidate = candidates.find(c => c.id === id);
-                      if (!candidate) return null;
-                      return (
-                        <td key={id} style={{ fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem', color: 'var(--color-ink-light)' }}>
-                          "{candidate.evaluation?.summary || 'No evaluation'}"
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="modal-footer">
-              <button 
-                type="button" 
-                className="btn-primary" 
-                style={{ width: 'auto', padding: '0.6rem 2rem', backgroundColor: 'var(--color-sage)' }}
-                onClick={() => setIsCompareModalOpen(false)}
-              >
-                Close Comparison
-              </button>
+                    {/* Key Match Summary Phrases */}
+                    <tr style={{ backgroundColor: 'var(--color-paper-light)' }}>
+                      <td style={{ padding: '1rem 0.5rem' }}>
+                        <strong>Recruiter Summary</strong>
+                        <span className="text-xs text-muted" style={{ display: 'block', fontWeight: 'normal' }}>Offline match engine overview</span>
+                      </td>
+                      {comparedCandidates.map(candidate => {
+                        return (
+                          <td key={candidate.id} style={{ fontSize: '0.85rem', fontStyle: 'italic', padding: '1rem', color: 'var(--color-ink-light)' }}>
+                            "{candidate.evaluation?.summary || 'No evaluation'}"
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  style={{ width: 'auto', padding: '0.6rem 2rem', backgroundColor: 'var(--color-sage)' }}
+                  onClick={() => setIsCompareModalOpen(false)}
+                >
+                  Close Comparison
+                </button>
+              </div>
             </div>
           </div>
-        </div>
         );
       })()}
     </div>
