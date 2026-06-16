@@ -7,6 +7,25 @@ import {
 
 import { supabase } from './supabase';
 
+const CANDIDATE_COLUMNS = [
+  'id', 'name', 'fileName', 'fileSize', 'status', 'ocrProgress',
+  'text', 'numChars', 'errorDetails', 'score', 'stage', 'noticePeriod',
+  'currentCtc', 'expectedCtc', 'location', 'preferredLocation',
+  'resumeQuality', 'evaluation', 'scorecard', 'activityLog', 'jobsData',
+  'created_at'
+];
+
+const sanitizeCandidate = (c) => {
+  if (!c) return c;
+  const sanitized = {};
+  CANDIDATE_COLUMNS.forEach(col => {
+    if (c[col] !== undefined) {
+      sanitized[col] = c[col];
+    }
+  });
+  return sanitized;
+};
+
 // Help helper for dynamic CDN loading
 const loadScript = (src, globalName, timeoutMs = 12000) => {
   return new Promise((resolve, reject) => {
@@ -1297,7 +1316,8 @@ Requirements:
       if (jobsErr) throw jobsErr;
 
       // 2. Seed candidates
-      const { error: candErr } = await supabase.from('candidates').upsert(candidates);
+      const sanitizedCandidates = candidates.map(sanitizeCandidate);
+      const { error: candErr } = await supabase.from('candidates').upsert(sanitizedCandidates);
       if (candErr) throw candErr;
 
       // 3. Seed email templates
@@ -1397,7 +1417,8 @@ Requirements:
         prevCandidatesRef.current = dbCandidates;
         setCandidates(dbCandidates);
       } else {
-        const { error: err } = await supabase.from('candidates').upsert(candidates);
+        const sanitizedCandidates = candidates.map(sanitizeCandidate);
+        const { error: err } = await supabase.from('candidates').upsert(sanitizedCandidates);
         if (err) throw err;
         seededAny = true;
       }
@@ -1461,21 +1482,26 @@ Requirements:
       try {
         const prev = prevCandidatesRef.current;
         
+        // Map to sanitized objects for safe comparison and upsert
+        const sanitizedCandidates = candidates.map(sanitizeCandidate);
+        const prevSanitized = prev.map(sanitizeCandidate);
+
         // Find deleted
-        const deleted = prev.filter(p => !candidates.some(c => c.id === p.id));
+        const deleted = prevSanitized.filter(p => !sanitizedCandidates.some(c => c.id === p.id));
         for (const d of deleted) {
           await supabase.from('candidates').delete().eq('id', d.id);
         }
 
         // Find upserted
-        const changed = candidates.filter(c => {
-          const p = prev.find(prevC => prevC.id === c.id);
+        const changed = sanitizedCandidates.filter(c => {
+          const p = prevSanitized.find(prevC => prevC.id === c.id);
           if (!p) return true;
           return JSON.stringify(p) !== JSON.stringify(c);
         });
 
         if (changed.length > 0) {
-          await supabase.from('candidates').upsert(changed);
+          const { error: upsertErr } = await supabase.from('candidates').upsert(changed);
+          if (upsertErr) throw upsertErr;
         }
 
         prevCandidatesRef.current = candidates;
