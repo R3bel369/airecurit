@@ -1486,14 +1486,18 @@ Requirements:
         const sanitizedCandidates = candidates.map(sanitizeCandidate);
         const prevSanitized = prev.map(sanitizeCandidate);
 
-        // Find deleted
-        const deleted = prevSanitized.filter(p => !sanitizedCandidates.some(c => c.id === p.id));
+        // Find deleted (if ID is completely removed from React state)
+        const deleted = prevSanitized.filter(p => !candidates.some(c => c.id === p.id));
         for (const d of deleted) {
           await supabase.from('candidates').delete().eq('id', d.id);
         }
 
-        // Find upserted
-        const changed = sanitizedCandidates.filter(c => {
+        // Find upserted (only include stable candidate states to prevent race condition updates)
+        const stableSanitizedCandidates = sanitizedCandidates.filter(
+          c => c.status !== 'reading' && c.status !== 'ocr_progress' && c.status !== 'screening'
+        );
+
+        const changed = stableSanitizedCandidates.filter(c => {
           const p = prevSanitized.find(prevC => prevC.id === c.id);
           if (!p) return true;
           return JSON.stringify(p) !== JSON.stringify(c);
