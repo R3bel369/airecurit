@@ -2,8 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Upload, FileText, Check, AlertCircle, Copy, Settings, Sparkles, 
   Trash2, Eye, EyeOff, CheckCircle, RefreshCw, AlertTriangle, ChevronDown, ChevronUp,
-  Mail, Send, X, Sun, Moon
+  Mail, Send, X, Sun, Moon, Briefcase, Globe, Users, Target, TrendingUp, Zap, DollarSign,
+  LogOut, Lock, LayoutDashboard, User, Bookmark, Star, ClipboardList, Award, Calendar,
+  FileCheck, Folder, MessageSquare, Bell, Bot, FolderOpen, ChevronLeft, ChevronRight, BookOpen, Search
 } from 'lucide-react';
+
+
+
 
 import { supabase } from './supabase';
 
@@ -246,328 +251,251 @@ function getCandidateDisplayScore(candidate) {
 function analyzeCandidateOffline(candidate, jobTitle, jobDescription, mustHaves) {
   const candidateTextLower = (candidate.text || '').toLowerCase();
   const jdLower = (jobDescription || '').toLowerCase();
-  
-  // 1. Extract Keywords
-  const jdKeywords = extractKeywords(jobDescription, mustHaves);
-  const matched = [];
-  const missing = [];
-  
-  jdKeywords.forEach(kw => {
-    let pattern;
-    if (/[+#]/.test(kw)) {
-      pattern = new RegExp('(^|\\s)' + escapeRegExp(kw) + '(\\s|$|\\.)', 'i');
-    } else {
-      pattern = new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i');
-    }
-    
-    if (pattern.test(candidateTextLower)) {
-      matched.push(kw);
-    } else {
-      missing.push(kw);
-    }
-  });
 
-  // Extract Must-Haves
-  const mustHaveKeywords = mustHaves ? extractKeywords(mustHaves, '') : [];
-  const missingMustHaves = mustHaveKeywords.filter(kw => {
-    let pattern;
-    if (/[+#]/.test(kw)) {
-      pattern = new RegExp('(^|\\s)' + escapeRegExp(kw) + '(\\s|$|\\.)', 'i');
-    } else {
-      pattern = new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i');
-    }
-    return !pattern.test(candidateTextLower);
-  });
+  // ─── 1. Parse Must-Have items into named requirements ────────────────────────
+  const parseMustHaveItems = (mhText) => {
+    if (!mhText || !mhText.trim()) return [];
+    return mhText.split(/[,;\n]+/).map(s => s.trim()).filter(s => s.length > 1).map(raw => {
+      const synonyms = [raw.toLowerCase()];
+      const synMap = {
+        'react': ['react.js', 'reactjs'], 'node': ['node.js', 'nodejs'],
+        'next.js': ['nextjs', 'next js'], 'vue': ['vue.js', 'vuejs'],
+        'angular': ['angularjs', 'angular.js'], 'typescript': ['ts', 'tsx'],
+        'javascript': ['js', 'ecmascript', 'es6'], 'python': ['py'],
+        'aws': ['amazon web services'], 'gcp': ['google cloud platform', 'google cloud'],
+        'kubernetes': ['k8s'], 'ci/cd': ['cicd', 'continuous integration', 'continuous delivery'],
+        'postgresql': ['postgres', 'psql'], 'machine learning': ['ml', 'ai/ml'],
+        'agile': ['scrum', 'agile methodology'], 'rest api': ['restful', 'rest apis'],
+        'graphql': ['graph ql'], 'docker': ['containerization'],
+        'tailwind': ['tailwind css', 'tailwindcss'], 'sass': ['scss'],
+        'sql': ['structured query language'], 'nlp': ['natural language processing'],
+        'pytorch': ['torch'], 'tensorflow': ['tf', 'keras'],
+        'spring boot': ['spring framework'],
+      };
+      const lowerRaw = raw.toLowerCase().trim();
+      for (const [key, vals] of Object.entries(synMap)) {
+        if (lowerRaw.includes(key) || vals.some(v => lowerRaw.includes(v))) synonyms.push(key, ...vals);
+      }
+      const expMatch = raw.match(/(\d+)\+?\s*(?:years?|yrs?)/i);
+      return { label: raw, synonyms: [...new Set(synonyms)], isExperienceReq: !!expMatch, requiredExpYears: expMatch ? parseInt(expMatch[1]) : null };
+    });
+  };
+  const mustHaveItems = parseMustHaveItems(mustHaves);
 
-  // 2. Subscore Calculations
-  
-  // Skills Score (30%)
-  const skillsScore = jdKeywords.length === 0 
-    ? 80 
-    : Math.round(50 + (matched.length / jdKeywords.length) * 50);
-
-  // Experience Score (25%)
-  // Required experience in JD
-  const expRegex = /\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/g;
-  let match;
-  let requiredYears = 0;
-  while ((match = expRegex.exec(jdLower)) !== null) {
-    const val = parseInt(match[1]);
-    if (val > requiredYears && val < 20) {
-      requiredYears = val;
-    }
-  }
-  if (requiredYears === 0) {
-    if (/lead|senior|architect|principal|manager/i.test(jobTitle) || /lead|senior|architect|principal|manager/i.test(jobDescription)) {
-      requiredYears = 5;
-    } else {
-      requiredYears = 2;
-    }
-  }
-
-  // Candidate experience in resume
+  // ─── 2. Candidate experience years ───────────────────────────────────────────
   let candidateYears = 0;
-  let matchCand;
   const candExpRegex = /\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/g;
+  let matchCand;
   while ((matchCand = candExpRegex.exec(candidateTextLower)) !== null) {
-    const val = parseInt(matchCand[1]);
-    if (val > candidateYears && val < 40) {
-      candidateYears = val;
+    const v = parseInt(matchCand[1]);
+    if (v > candidateYears && v < 40) candidateYears = v;
+  }
+  if (/director|vp|vice president|head of/i.test(candidateTextLower))                  candidateYears = Math.max(candidateYears, 12);
+  else if (/principal|architect|lead engineer|lead developer/i.test(candidateTextLower)) candidateYears = Math.max(candidateYears, 8);
+  else if (/senior|sr\./i.test(candidateTextLower))                                     candidateYears = Math.max(candidateYears, 5);
+  else if (/junior|jr\.|intern|entry/i.test(candidateTextLower))                        candidateYears = Math.max(candidateYears, 1);
+  if (candidateYears === 0) candidateYears = 2;
+
+  // ─── 3. Evaluate each Must-Have requirement ───────────────────────────────────
+  const mustHaveResults = mustHaveItems.map(item => {
+    if (item.isExperienceReq) {
+      const met = candidateYears >= item.requiredExpYears;
+      return { label: item.label, met, reason: met ? `Has ${candidateYears} yrs (req: ${item.requiredExpYears}+)` : `Has ${candidateYears} yrs (req: ${item.requiredExpYears}+)`, isExperienceReq: true };
     }
-  }
-  
-  let titleInferredYears = 0;
-  if (/director|vp|vice president|head of/i.test(candidateTextLower)) {
-    titleInferredYears = 10;
-  } else if (/principal|architect|lead engineer|lead developer/i.test(candidateTextLower)) {
-    titleInferredYears = 8;
-  } else if (/senior|sr\./i.test(candidateTextLower)) {
-    titleInferredYears = 5;
-  } else if (/junior|jr\.|intern|entry/i.test(candidateTextLower)) {
-    titleInferredYears = 1;
-  }
-  
-  candidateYears = Math.max(candidateYears, titleInferredYears);
-  if (candidateYears === 0) {
-    candidateYears = 2; // general baseline assumption
-  }
-
-  let experienceScore = 75;
-  const diff = candidateYears - requiredYears;
-  if (diff >= 0) {
-    experienceScore = Math.min(100, 85 + diff * 3);
-  } else {
-    experienceScore = Math.max(40, 75 + diff * 8);
-  }
-
-  // Industry Score (10%)
-  const jdIndustries = INDUSTRIES.filter(ind => new RegExp('\\b' + escapeRegExp(ind) + '\\b', 'i').test(jdLower));
-  const candIndustries = INDUSTRIES.filter(ind => new RegExp('\\b' + escapeRegExp(ind) + '\\b', 'i').test(candidateTextLower));
-  const matchedIndustries = jdIndustries.filter(ind => candIndustries.includes(ind));
-  
-  let industryScore = 75;
-  if (jdIndustries.length > 0) {
-    if (matchedIndustries.length > 0) {
-      industryScore = 95;
-    } else {
-      industryScore = 60;
-    }
-  } else {
-    const generalBusinessKeywords = ['client', 'customer', 'business', 'enterprise', 'market', 'commercial', 'stakeholder'];
-    const businessMatches = generalBusinessKeywords.filter(kw => new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i').test(candidateTextLower));
-    industryScore = Math.round(75 + (businessMatches.length / generalBusinessKeywords.length) * 20);
-  }
-
-  // Projects Score (10%)
-  const projectKeywords = ['project', 'projects', 'portfolio', 'github', 'delivered', 'built', 'spearheaded', 'orchestrated', 'designed', 'scaled', 'implemented'];
-  let projectMatches = 0;
-  projectKeywords.forEach(kw => {
-    const reg = new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'gi');
-    projectMatches += (candidateTextLower.match(reg) || []).length;
+    const found = item.synonyms.some(syn => {
+      if (/[+#]/.test(syn)) return new RegExp('(^|\\s)' + escapeRegExp(syn) + '(\\s|$|\\.)', 'i').test(candidateTextLower);
+      return new RegExp('\\b' + escapeRegExp(syn) + '\\b', 'i').test(candidateTextLower);
+    });
+    return { label: item.label, met: found, reason: found ? 'Found in resume' : 'Not found in resume', isExperienceReq: false };
   });
-  const projectsScore = Math.min(100, Math.max(50, 65 + projectMatches * 2));
 
-  // Education Score (5%)
-  let candidateEducationLevel = 'bachelor';
-  if (/ph\.?d|doctorate/i.test(candidateTextLower)) {
-    candidateEducationLevel = 'phd';
-  } else if (/master|m\.?s\.?|m\.?tech|mba/i.test(candidateTextLower)) {
-    candidateEducationLevel = 'master';
-  } else if (/bachelor|b\.?s\.?|b\.?tech|b\.?e\.?/i.test(candidateTextLower)) {
-    candidateEducationLevel = 'bachelor';
-  } else if (/associate|diploma/i.test(candidateTextLower)) {
-    candidateEducationLevel = 'associate';
-  } else if (/university|college|school/i.test(candidateTextLower)) {
-    candidateEducationLevel = 'college';
-  } else {
-    candidateEducationLevel = 'none';
-  }
+  const mustHaveMet   = mustHaveResults.filter(r => r.met).length;
+  const mustHaveTotal = mustHaveResults.length;
+  const mustHavePct   = mustHaveTotal > 0 ? mustHaveMet / mustHaveTotal : 1;
+  const missingMustHaves = mustHaveResults.filter(r => !r.met).map(r => r.label);
 
-  let jdEducationLevel = 'none';
-  if (/ph\.?d|doctorate/i.test(jdLower)) {
-    jdEducationLevel = 'phd';
-  } else if (/master|m\.?s\.?|mba/i.test(jdLower)) {
-    jdEducationLevel = 'master';
-  } else if (/degree|bachelor|b\.?s\.?/i.test(jdLower)) {
-    jdEducationLevel = 'bachelor';
-  }
+  // ─── 4. JD keyword matching ───────────────────────────────────────────────────
+  const jdKeywords = extractKeywords(jobDescription, mustHaves);
+  const matched = [], missing = [];
+  jdKeywords.forEach(kw => {
+    const pat = /[+#]/.test(kw)
+      ? new RegExp('(^|\\s)' + escapeRegExp(kw) + '(\\s|$|\\.)', 'i')
+      : new RegExp('\\b' + escapeRegExp(kw) + '\\b', 'i');
+    pat.test(candidateTextLower) ? matched.push(kw) : missing.push(kw);
+  });
 
-  const educationLevelWeights = { phd: 5, master: 4, bachelor: 3, associate: 2, college: 1, none: 0 };
-  const candWeight = educationLevelWeights[candidateEducationLevel];
-  const jdWeight = educationLevelWeights[jdEducationLevel];
+  // ─── 5. Required experience from JD text ──────────────────────────────────────
+  const expRegex2 = /\b(\d{1,2})\+?\s*(?:years?|yrs?)\b/g;
+  let expM2; let requiredYears = 0;
+  while ((expM2 = expRegex2.exec(jdLower)) !== null) { const v = parseInt(expM2[1]); if (v > requiredYears && v < 20) requiredYears = v; }
+  if (requiredYears === 0) requiredYears = /lead|senior|architect|principal|manager/i.test(jobTitle + ' ' + jobDescription) ? 5 : 2;
 
-  let educationScore = 80;
-  if (candWeight >= jdWeight) {
-    educationScore = candWeight > jdWeight ? 95 : 88;
-    if (candidateEducationLevel === 'phd') educationScore = 100;
-  } else {
-    educationScore = Math.max(50, 80 - (jdWeight - candWeight) * 15);
-  }
+  // ─── 6. Sub-scores ────────────────────────────────────────────────────────────
+  const mustHaveScore   = mustHaveTotal === 0 ? 90 : Math.round(mustHavePct * 100);
+  const skillsScore     = jdKeywords.length === 0 ? 80 : Math.round(45 + (matched.length / jdKeywords.length) * 55);
+  const diff            = candidateYears - requiredYears;
+  const experienceScore = diff >= 0 ? Math.min(100, 80 + diff * 4) : Math.max(30, 70 + diff * 10);
+  const eduLevel        = s => /ph\.?d|doctorate/i.test(s) ? 5 : /master|m\.?s\.?|m\.?tech|mba/i.test(s) ? 4 : /bachelor|b\.?s\.?|b\.?tech|b\.?e\.?/i.test(s) ? 3 : /associate|diploma/i.test(s) ? 2 : /university|college|school/i.test(s) ? 1 : 0;
+  const candEduW        = eduLevel(candidateTextLower);
+  const jdEduReqStr     = /ph\.?d|doctorate/i.test(jdLower) ? 'phd' : /master|m\.?s\.?|mba/i.test(jdLower) ? 'master' : /degree|bachelor|b\.?s\.?/i.test(jdLower) ? 'bachelor' : 'none';
+  const jdEduW          = { phd: 5, master: 4, bachelor: 3, associate: 2, college: 1, none: 0 }[jdEduReqStr] || 0;
+  const educationScore  = candEduW >= jdEduW ? (candEduW > jdEduW ? 95 : 85) : Math.max(45, 80 - (jdEduW - candEduW) * 15);
 
-  // Communication Score (10%)
-  const actionVerbs = [
-    'spearheaded', 'orchestrated', 'engineered', 'streamlined', 'optimized', 'managed', 'designed', 'built',
-    'implemented', 'led', 'formulated', 'developed', 'coordinated', 'architected', 'facilitated', 'initiated',
-    'achieved', 'improved', 'increased', 'reduced', 'established', 'delivered', 'integrated'
-  ];
+  const actionVerbs = ['spearheaded','orchestrated','engineered','streamlined','optimized','managed','designed','built','implemented','led','developed','coordinated','architected','delivered','improved','increased','reduced'];
   let actionVerbCount = 0;
-  actionVerbs.forEach(verb => {
-    const reg = new RegExp('\\b' + escapeRegExp(verb) + '\\b', 'gi');
-    actionVerbCount += (candidateTextLower.match(reg) || []).length;
-  });
-  const bulletCount = (candidateTextLower.match(/[•\-\*]/g) || []).length;
-  const charCount = candidateTextLower.length;
-  let sizeScore = 80;
-  if (charCount < 400) {
-    sizeScore = 50;
-  } else if (charCount > 15000) {
-    sizeScore = 70;
-  } else {
-    sizeScore = 95;
-  }
-  const communicationScore = Math.round(sizeScore * 0.4 + Math.min(100, actionVerbCount * 2.5) * 0.3 + Math.min(100, bulletCount * 1.5) * 0.3);
+  actionVerbs.forEach(v => { actionVerbCount += (candidateTextLower.match(new RegExp('\\b' + v + '\\b', 'gi')) || []).length; });
+  const bulletCount  = (candidateTextLower.match(/[•\-\*]/g) || []).length;
+  const charCount    = candidateTextLower.length;
+  const sizeScore    = charCount < 400 ? 40 : charCount > 15000 ? 70 : 95;
+  const qualityScore = Math.round(sizeScore * 0.4 + Math.min(100, actionVerbCount * 3) * 0.35 + Math.min(100, bulletCount * 1.5) * 0.25);
 
-  // Growth Score (10%)
-  const growthIndicators = [
-    'promoted', 'progression', 'advanced', 'career', 'certified', 'certification', 'training', 'bootcamp',
-    'mentored', 'mentor', 'coached', 'led team', 'leadership', 'initiative', 'exceeded', 'growth'
-  ];
+  const growthWords = ['promoted','progression','certified','certification','mentored','leadership','initiative','exceeded'];
   let growthCount = 0;
-  growthIndicators.forEach(word => {
-    const reg = new RegExp('\\b' + escapeRegExp(word) + '\\b', 'gi');
-    growthCount += (candidateTextLower.match(reg) || []).length;
-  });
-  const growthScore = Math.min(100, Math.max(55, 65 + growthCount * 4));
+  growthWords.forEach(w => { growthCount += (candidateTextLower.match(new RegExp('\\b' + w + '\\b', 'gi')) || []).length; });
+  const growthScore = Math.min(100, Math.max(50, 60 + growthCount * 5));
 
-  // 3. Final Overall Score
-  const calculatedScore = Math.round(
-    skillsScore * 0.30 +
-    experienceScore * 0.25 +
-    industryScore * 0.10 +
-    projectsScore * 0.10 +
-    educationScore * 0.05 +
-    communicationScore * 0.10 +
-    growthScore * 0.10
+  // ─── 7. Raw weighted score (Must-Haves carry 35%) ────────────────────────────
+  const rawScore = Math.round(
+    mustHaveScore   * 0.35 +
+    skillsScore     * 0.25 +
+    experienceScore * 0.20 +
+    educationScore  * 0.05 +
+    qualityScore    * 0.10 +
+    growthScore     * 0.05
   );
 
-  // 4. Summaries & Insights
+  // ─── 8. Must-Have Gate — hard score cap decides fate ─────────────────────────
+  let calculatedScore = rawScore;
+  let gateStatus = 'pass';
+  let gateReason = '';
+  if (mustHaveTotal > 0) {
+    if (mustHavePct < 0.34) {
+      calculatedScore = Math.min(rawScore, 52);
+      gateStatus = 'hard_fail';
+      gateReason = `Failed ${mustHaveTotal - mustHaveMet}/${mustHaveTotal} must-haves (${Math.round((1-mustHavePct)*100)}% miss rate). Hard-capped at 52 — recommend decline.`;
+    } else if (mustHavePct < 0.60) {
+      calculatedScore = Math.min(rawScore, 67);
+      gateStatus = 'soft_fail';
+      gateReason = `Missing ${mustHaveTotal - mustHaveMet}/${mustHaveTotal} must-haves. Capped at 67 — borderline, phone screen recommended.`;
+    } else if (mustHavePct < 0.80) {
+      calculatedScore = Math.min(rawScore, 79);
+      gateStatus = 'partial';
+      gateReason = `Met ${mustHaveMet}/${mustHaveTotal} must-haves. Minor gaps — score capped at 79.`;
+    } else {
+      gateStatus = 'pass';
+      gateReason = `Met ${mustHaveMet}/${mustHaveTotal} must-haves — no cap applied.`;
+    }
+  }
+  calculatedScore = Math.max(25, Math.min(100, calculatedScore));
+
+  // ─── 9. Fate verdict ─────────────────────────────────────────────────────────
   const cleanedName = formatName(candidate.name);
+  let fateLevel = 'Not a Fit';
   let summaryText = '';
   if (calculatedScore >= 80) {
-    summaryText = `${cleanedName} shows outstanding alignment for the ${jobTitle || 'role'}. They bring ${candidateYears} years of experience with deep technical capability in ${matched.slice(0, 3).join(', ') || 'required systems'}, combined with strong indicators of career progression and excellent presentation.`;
+    fateLevel = 'Shortlist';
+    summaryText = `${cleanedName} is a strong match. They satisfy ${mustHaveMet}/${mustHaveTotal} must-haves, bring ${candidateYears} yrs of experience (${requiredYears}+ required), and match ${matched.length}/${jdKeywords.length} JD keywords. Recommended for immediate interview.`;
   } else if (calculatedScore >= 70) {
-    summaryText = `${cleanedName} is a strongly matched candidate for the ${jobTitle || 'role'}. With ${candidateYears} years of experience and core skills in ${matched.slice(0, 3).join(', ') || 'essential areas'}, they meet most requirements. Minor gaps exist in secondary areas (such as ${missing.slice(0, 2).join(', ') || 'none'}), which can be clarified.`;
+    fateLevel = 'Shortlist';
+    summaryText = `${cleanedName} meets the minimum bar: ${mustHaveMet}/${mustHaveTotal} must-haves satisfied, ${candidateYears} yrs experience, ${Math.round((matched.length/Math.max(jdKeywords.length,1))*100)}% keyword coverage. Recommend technical screening.`;
   } else if (calculatedScore >= 60) {
-    summaryText = `${cleanedName} is a borderline candidate. They have ${candidateYears} years of experience and some matching attributes, but lack key skills requested in the specification (missing: ${missing.slice(0, 3).join(', ') || 'essential criteria'}).`;
+    fateLevel = 'Borderline';
+    summaryText = `${cleanedName} partially meets requirements. Missing must-haves: ${missingMustHaves.slice(0,3).join(', ')||'none'}. Exp: ${candidateYears}/${requiredYears} yrs. Phone screen recommended to clarify gaps.`;
+  } else if (calculatedScore >= 50) {
+    fateLevel = 'Not a Fit';
+    summaryText = `${cleanedName} falls below threshold. Missing critical must-haves: ${missingMustHaves.slice(0,3).join(', ')}. Only ${mustHaveMet}/${mustHaveTotal} requirements met with ${candidateYears} yrs experience.`;
   } else {
-    summaryText = `${cleanedName} exhibits low overall match metrics. The profile lacks key technical alignment and has limited overlapping experience or educational context compared to the requirements.`;
+    fateLevel = 'Reject';
+    summaryText = `${cleanedName} does not meet requirements. Only ${mustHaveMet}/${mustHaveTotal} must-haves satisfied. Insufficient alignment — recommend declining.`;
   }
 
-  const nextStepReasonText = `Candidate scored ${calculatedScore}/100. They have ${candidateYears} years of experience (role asks for ~${requiredYears} yrs) and match ${matched.length} key keywords, showing ${matched.length >= jdKeywords.length * 0.7 ? 'excellent' : 'moderate'} skill coverage.`;
-
-  // Strengths
+  // ─── 10. Strengths & Risks tied to JD requirements ───────────────────────────
   const strengths = [];
-  if (skillsScore >= 80) {
-    strengths.push(`Matches core skills requested in the job specification (${matched.slice(0, 3).join(', ') || 'all tools'}).`);
-  }
-  if (experienceScore >= 80) {
-    strengths.push(`Strong tenure of ${candidateYears} years meets or exceeds the required level.`);
-  } else {
-    strengths.push(`Brings ${candidateYears} years of professional experience.`);
-  }
-  if (growthScore >= 80) {
-    strengths.push(`Demonstrates clear leadership, progression, or active certification updates.`);
-  }
-  if (communicationScore >= 80) {
-    strengths.push(`Strong resume clarity, readability, and use of professional action verbs.`);
-  }
-  while (strengths.length < 2) {
-    strengths.push(`Solid practical project contributions and implementation focus.`);
-    strengths.push(`Demonstrated professional or academic background alignment.`);
-  }
-
-  // Risks
   const risks = [];
-  if (missingMustHaves.length > 0) {
-    risks.push(`Lacks explicit mention of must-have specifications: ${missingMustHaves.slice(0, 2).join(', ')}.`);
-  }
-  if (missing.length > 2) {
-    risks.push(`Gaps in secondary tools or techniques: ${missing.slice(0, 3).join(', ')}.`);
-  }
-  if (experienceScore < 70) {
-    risks.push(`Candidate experience of ${candidateYears} years is below the expected ${requiredYears} years.`);
-  }
-  if (communicationScore < 70) {
-    risks.push(`Resume text would benefit from more detailed metrics or action-oriented phrases.`);
-  }
-  if (risks.length === 0) {
-    risks.push(`Confirm technical depth and hands-on exposure in ${matched.slice(0, 2).join(', ') || 'main areas'} during initial screening.`);
-  }
+  if (mustHavePct >= 0.8)    strengths.push(`Satisfies ${mustHaveMet}/${mustHaveTotal} must-have requirements — strong JD alignment.`);
+  if (experienceScore >= 80)  strengths.push(`${candidateYears} yrs experience meets/exceeds the ${requiredYears}+ yr requirement.`);
+  if (skillsScore >= 80)      strengths.push(`High JD keyword coverage: ${matched.length}/${jdKeywords.length} skills matched (${matched.slice(0,3).join(', ')}).`);
+  if (growthScore >= 80)      strengths.push(`Resume shows career progression, leadership, or active certifications.`);
+  if (qualityScore >= 80)     strengths.push(`Well-structured resume with strong action verbs and achievements.`);
+  while (strengths.length < 2) strengths.push(`Practical implementation experience and domain exposure detected.`);
 
-  // Inferred Metrics
-  const noticePeriod = candidate.noticePeriod || inferNoticePeriod(candidateTextLower, candidateYears);
-  const currentCtc = candidate.currentCtc || inferCurrentCtc(candidateYears);
-  const expectedCtc = candidate.expectedCtc || inferExpectedCtc(currentCtc);
-  const location = candidate.location || inferLocation(candidateTextLower);
-  const preferredLocation = candidate.preferredLocation || `${location}, Remote`;
-  const resumeQuality = candidate.resumeQuality || inferResumeQuality(communicationScore, growthScore);
-  const scorecard = candidate.scorecard || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "" };
-  
-  const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const activityLog = candidate.activityLog || [
-    { id: 1, type: "applied", text: "Candidate profile added to screening queue", timestamp: timeStr },
-    { id: 2, type: "screened", text: `ATS Match Screen complete. ATS Score: ${calculatedScore}%`, timestamp: timeStr }
-  ];
+  if (missingMustHaves.length > 0) risks.push(`🚨 Missing must-have(s): ${missingMustHaves.slice(0,3).join(', ')}.`);
+  if (diff < -1)               risks.push(`Experience gap: ${candidateYears} yrs vs ${requiredYears} required — ${Math.abs(diff)} yr(s) short.`);
+  if (missing.length > 3)      risks.push(`${missing.length} JD keywords absent from resume: ${missing.slice(0,3).join(', ')}.`);
+  if (qualityScore < 60)       risks.push(`Resume lacks quantified achievements or action-oriented language.`);
+  if (risks.length === 0)      risks.push(`Validate depth in ${matched.slice(0,2).join(', ')||'core technologies'} during interview.`);
 
-  // 3. Tailored Interview Guide Questions (PyjamaHR Feature)
+  // ─── 11. Targeted interview questions ────────────────────────────────────────
   const interviewQuestions = [
     {
-      type: "Technical Probe",
-      question: missing.length > 0 
-        ? `We noticed your profile doesn't explicitly mention "${missing[0]}". Could you describe your hands-on exposure to it, or how you would approach learning/adapting to it in this role?`
-        : `Since you match all core requirements, could you elaborate on a complex project where you pushed the boundaries of "${matched[0] || 'software development'}" and what architecture tradeoffs you made?`,
-      skill: missing.length > 0 ? missing[0] : (matched[0] || 'core stack')
+      type: 'Must-Have Probe',
+      question: missingMustHaves.length > 0
+        ? `Your resume doesn't explicitly show "${missingMustHaves[0]}" — a core requirement. Can you describe your hands-on experience with it, or the closest equivalent?`
+        : `You meet all key requirements. Describe a complex challenge using "${matched[0]||'your primary stack'}" — what was the hardest technical decision you made?`,
+      skill: missingMustHaves[0] || (matched[0] || 'core requirement')
     },
     {
-      type: "Validation Probe",
+      type: 'Experience Depth Probe',
+      question: `This role requires ${requiredYears}+ years of relevant experience. Walk us through your most technically demanding project in the last ${Math.min(candidateYears, 3)} years — your specific contribution and the business impact.`,
+      skill: `${candidateYears} yrs vs ${requiredYears}+ required`
+    },
+    {
+      type: 'Skill Validation Probe',
       question: matched.length > 0
-        ? `You've worked extensively with "${matched[0]}". Can you share an example of a challenging debugging or scaling issue you encountered with it, and how you resolved it?`
-        : `Could you tell us about a technical architecture decision you made in your recent role, detailing the options considered and why you selected the final route?`,
-      skill: matched.length > 0 ? matched[0] : 'core technology'
-    },
-    {
-      type: "Behavioral Probe",
-      question: `Describe a situation where you had to coordinate with cross-functional stakeholders (like product managers or business heads) under tight deadlines or ambiguous requirements. How did you align expectations and deliver?`,
-      skill: 'Stakeholder Alignment'
+        ? `You've listed "${matched[0]}". Give a concrete production-level example — scale, architecture, and lessons learned.`
+        : `How would you approach learning "${missing[0]||'a new technology'}" if required? What is your learning process?`,
+      skill: matched[0] || (missing[0] || 'core skill')
     }
+  ];
+
+  // ─── 12. Inferred logistics ───────────────────────────────────────────────────
+  const noticePeriod     = candidate.noticePeriod     || inferNoticePeriod(candidateTextLower, candidateYears);
+  const currentCtc       = candidate.currentCtc        || inferCurrentCtc(candidateYears);
+  const expectedCtc      = candidate.expectedCtc       || inferExpectedCtc(currentCtc);
+  const location         = candidate.location          || inferLocation(candidateTextLower);
+  const preferredLocation = candidate.preferredLocation || `${location}, Remote`;
+  const resumeQuality    = candidate.resumeQuality     || Math.min(100, qualityScore);
+  const scorecard        = candidate.scorecard         || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: '' };
+  const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const activityLog = candidate.activityLog || [
+    { id: 1, type: 'applied',  text: 'Profile added to screening queue', timestamp: timeStr },
+    { id: 2, type: 'screened', text: `ATS Screen: ${calculatedScore}/100 | Must-Haves: ${mustHaveMet}/${mustHaveTotal} | Gate: ${gateStatus}`, timestamp: timeStr }
   ];
 
   return {
-    candidate_name: cleanedName,
-    summary: summaryText,
+    candidate_name:      cleanedName,
+    summary:             summaryText,
+    fate_level:          fateLevel,
+    gate_status:         gateStatus,
+    gate_reason:         gateReason,
+    must_have_results:   mustHaveResults,
+    must_have_met:       mustHaveMet,
+    must_have_total:     mustHaveTotal,
+    must_have_pct:       Math.round(mustHavePct * 100),
     subscores: {
-      skills: skillsScore,
-      experience: experienceScore,
-      industry: industryScore,
-      projects: projectsScore,
-      education: educationScore,
-      communication: communicationScore,
-      growth: growthScore
+      'Must-Haves':      mustHaveScore,
+      'JD Skills':       skillsScore,
+      'Experience':      experienceScore,
+      'Education':       educationScore,
+      'Resume Quality':  qualityScore,
+      'Growth':          growthScore
     },
-    calculatedScore: calculatedScore,
-    matched_keywords: matched,
-    missing_keywords: missing,
-    strengths: strengths,
-    risks: risks,
-    next_step_reason: nextStepReasonText,
-    notice_period: noticePeriod,
-    current_ctc: currentCtc,
-    expected_ctc: expectedCtc,
-    location: location,
-    preferred_location: preferredLocation,
-    resume_quality: resumeQuality,
-    scorecard: scorecard,
-    activity_log: activityLog,
+    calculatedScore,
+    required_years:      requiredYears,
+    candidate_years:     candidateYears,
+    matched_keywords:    matched,
+    missing_keywords:    missing,
+    strengths,
+    risks,
+    next_step_reason:    `Score ${calculatedScore}/100 | Must-Haves ${mustHaveMet}/${mustHaveTotal} | Exp ${candidateYears}/${requiredYears}yr | Gate: ${gateStatus}`,
+    notice_period:       noticePeriod,
+    current_ctc:         currentCtc,
+    expected_ctc:        expectedCtc,
+    location,
+    preferred_location:  preferredLocation,
+    resume_quality:      resumeQuality,
+    scorecard,
+    activity_log:        activityLog,
     interview_questions: interviewQuestions
   };
 }
@@ -736,6 +664,266 @@ const JD_TEMPLATES = {
 };
 
 export default function App() {
+  // Authentication states
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [loginRole, setLoginRole] = useState('candidate'); // 'admin' | 'candidate'
+  const [loginMode, setLoginMode] = useState('login'); // 'login' | 'register'
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setLoginError('Email and Password are required.');
+      return;
+    }
+    // Admin must use the admin email
+    if (loginRole === 'admin' && loginEmail.trim().toLowerCase() !== 'admink338@gmail.com') {
+      setLoginError('Admin access requires the registered admin email.');
+      return;
+    }
+    setLoginError(null);
+    setIsSigningIn(true);
+    try {
+      if (loginMode === 'register' && loginRole === 'candidate') {
+        // Candidate registration
+        const { data, error } = await supabase.auth.signUp({
+          email: loginEmail,
+          password: loginPassword,
+        });
+        if (error) {
+          setLoginError(error.message || 'Registration failed. Try a different email.');
+        } else if (data.session) {
+          // Email confirmation disabled — logged in immediately
+          setSession(data.session);
+          setLoginEmail('');
+          setLoginPassword('');
+        } else {
+          // Email confirmation required OR account already exists — try direct sign-in
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: loginEmail,
+            password: loginPassword,
+          });
+          if (signInData?.session) {
+            setSession(signInData.session);
+            setLoginEmail('');
+            setLoginPassword('');
+          } else {
+            // Switch to login mode and show success
+            setLoginMode('login');
+            setLoginError(null);
+            alert('✅ Account created! Please sign in with your credentials.');
+          }
+        }
+      } else {
+        // Sign in (admin or candidate)
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: loginEmail,
+          password: loginPassword,
+        });
+        if (error) {
+          setLoginError(error.message || 'Invalid login credentials.');
+        } else {
+          setSession(data.session);
+          setLoginEmail('');
+          setLoginPassword('');
+        }
+      }
+    } catch (err) {
+      setLoginError('Failed to sign in. Please try again.');
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const handleCandidateAuth = async (e) => {
+    e.preventDefault();
+    if (!candidateEmail.trim() || !candidatePassword.trim()) {
+      setCandidateAuthError('Email and Password are required.');
+      return;
+    }
+    setCandidateAuthError(null);
+    setCandidateAuthLoading(true);
+
+    try {
+      if (candidateAuthMode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: candidateEmail,
+          password: candidatePassword,
+        });
+        if (error) {
+          setCandidateAuthError(error.message || 'Invalid login credentials.');
+        } else {
+          setIsCandidateAuthOpen(false);
+          setCandidateEmail('');
+          setCandidatePassword('');
+        }
+      } else {
+        const { data: signUpData, error } = await supabase.auth.signUp({
+          email: candidateEmail,
+          password: candidatePassword,
+        });
+        if (error) {
+          setCandidateAuthError(error.message || 'Registration failed.');
+        } else if (signUpData.session) {
+          setIsCandidateAuthOpen(false);
+          setCandidateEmail('');
+          setCandidatePassword('');
+        } else {
+          // Try immediate sign-in after signup
+          const { data: siData } = await supabase.auth.signInWithPassword({
+            email: candidateEmail, password: candidatePassword
+          });
+          if (siData?.session) {
+            setIsCandidateAuthOpen(false);
+            setCandidateEmail('');
+            setCandidatePassword('');
+          } else {
+            alert('✅ Account created! Please sign in with your credentials.');
+            setCandidateAuthMode('login');
+          }
+        }
+      }
+    } catch (err) {
+      setCandidateAuthError('An error occurred. Please try again.');
+    } finally {
+      setCandidateAuthLoading(false);
+    }
+  };
+
+  const handleAssistantSubmit = (e, overrideQuery = null) => {
+    if (e) e.preventDefault();
+    const query = (overrideQuery || assistantInput).trim();
+    if (!query) return;
+
+    // Add user message
+    const userMsg = {
+      sender: 'user',
+      text: query,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setAssistantMessages(prev => [...prev, userMsg]);
+    if (!overrideQuery) setAssistantInput('');
+
+    // Process Response (Offline NLP parser)
+    setTimeout(() => {
+      let replyText = '';
+      const cleanQuery = query.toLowerCase();
+
+      if (cleanQuery.includes('best') || cleanQuery.includes('highest') || cleanQuery.includes('top')) {
+        // Find best candidate
+        const sorted = [...enrichedCandidates].sort((a, b) => (b.score || 0) - (a.score || 0));
+        if (sorted.length > 0 && sorted[0].score) {
+          replyText = `The highest-fitting candidate is **${sorted[0].name}** with an overall score of **${sorted[0].score}/100** matching your job description: "${jobTitle}". Would you like to draft an interview invite for them?`;
+        } else {
+          replyText = "There are no evaluated candidates in the screening queue yet. Please screen uploaded resumes first!";
+        }
+      } 
+      else if (cleanQuery.includes('immediate') || cleanQuery.includes('joiner') || cleanQuery.includes('notice')) {
+        // Find immediate joiners
+        const immediates = enrichedCandidates.filter(c => {
+          const np = c.evaluation?.notice_period || c.noticePeriod || '';
+          return np.toLowerCase().includes('immediate');
+        });
+        if (immediates.length > 0) {
+          replyText = `I found **${immediates.length}** immediate joiner(s):\n` + 
+            immediates.map(c => `• **${c.name}** (Expected: ${c.evaluation?.expected_ctc || c.expectedCtc} LPA, Location: ${c.evaluation?.location || c.location})`).join('\n') +
+            `\nThese profiles are highlighted and ready for contact!`;
+        } else {
+          replyText = "I couldn't find any candidates with an immediate notice period in the active list.";
+        }
+      } 
+      else if (cleanQuery.includes('react') || cleanQuery.includes('frontend') || cleanQuery.includes('typescript') || cleanQuery.includes('javascript')) {
+        // Filter by frontend skills
+        const keyword = cleanQuery.includes('react') ? 'react' : cleanQuery.includes('typescript') ? 'typescript' : cleanQuery.includes('javascript') ? 'javascript' : 'frontend';
+        const matches = enrichedCandidates.filter(c => {
+          const text = (c.text || '').toLowerCase();
+          return text.includes(keyword);
+        });
+        if (matches.length > 0) {
+          replyText = `Found **${matches.length}** candidate(s) with **${keyword}** in their resume:\n` + 
+            matches.map(c => `• **${c.name}** (ATS Match: ${c.score || 'Not Screened'}%)`).join('\n') +
+            `\nYou can use the search filter on the Candidates Manager tab to narrow this list further.`;
+        } else {
+          replyText = `No candidates in the current list mention "${keyword}" in their resume texts.`;
+        }
+      }
+      else if (cleanQuery.includes('summarize') || cleanQuery.includes('summary')) {
+        // Summarize a specific candidate
+        let foundCandidate = null;
+        for (const c of enrichedCandidates) {
+          if (cleanQuery.includes(c.name.toLowerCase().split(' ')[0])) {
+            foundCandidate = c;
+            break;
+          }
+        }
+        if (!foundCandidate && enrichedCandidates.length > 0) {
+          foundCandidate = enrichedCandidates[0]; // fallback to first
+        }
+
+        if (foundCandidate) {
+          const strengths = foundCandidate.evaluation?.strengths || ['Practical industry background'];
+          const risks = foundCandidate.evaluation?.risks || ['No major risks highlighted'];
+          replyText = `Here is a summary for **${foundCandidate.name}** (ATS Score: **${foundCandidate.score || 'N/A'}/100**):\n\n` +
+            `**Key Strengths:**\n` + strengths.map(s => `• ${s}`).join('\n') + `\n\n` +
+            `**Potential Risks:**\n` + risks.map(r => `• ${r}`).join('\n') + `\n\n` +
+            `**Logistics:** Location is ${foundCandidate.evaluation?.location || foundCandidate.location}, expected CTC is ${foundCandidate.evaluation?.expected_ctc || foundCandidate.expectedCtc} LPA with a ${foundCandidate.evaluation?.notice_period || foundCandidate.noticePeriod} notice period.`;
+        } else {
+          replyText = "I couldn't identify which candidate you'd like me to summarize. Please specify their first name!";
+        }
+      }
+      else if (cleanQuery.includes('email') || cleanQuery.includes('draft') || cleanQuery.includes('outreach')) {
+        // Draft an email for first candidate
+        const candidate = enrichedCandidates[0] || { name: 'Candidate', evaluation: { expected_ctc: 12 } };
+        replyText = `I have drafted an outreach template for **${candidate.name}**:\n\n` +
+          `*Subject: Application Update - ${jobTitle}*\n\n` +
+          `Dear ${candidate.name},\n` +
+          `Thank you for applying to the ${jobTitle} role. We reviewed your resume and were impressed by your background. We would like to schedule a 30-minute introductory interview. Please let us know your availability.\n\n` +
+          `Best regards,\nRecruiterPro Team`;
+      }
+      else {
+        replyText = "I understand! I can help you search the candidate pool. Try asking:\n" +
+          "• *'Who is the best candidate?'*\n" +
+          "• *'Show me immediate joiners'*\n" +
+          "• *'Who has React experience?'*\n" +
+          "• *'Summarize Rohan Mehta'*\n" +
+          "• *'Draft an outreach email'*";
+      }
+
+      setAssistantMessages(prev => [...prev, {
+        sender: 'assistant',
+        text: replyText,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    }, 800);
+  };
+
   // Setup States
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -949,9 +1137,15 @@ Requirements:
   const [threshold, setThreshold] = useState(70);
   
   // Notice Period & Compensation filter states
-  const [maxExpectedCtc, setMaxExpectedCtc] = useState(40);
+  const [maxExpectedCtc, setMaxExpectedCtc] = useState(60);
   const [noticePeriodFilter, setNoticePeriodFilter] = useState('any');
   const [locationFilter, setLocationFilter] = useState('');
+
+  // Extended filter & sort states
+  const [sortBy, setSortBy] = useState('score_desc'); // 'score_desc' | 'score_asc' | 'name_asc' | 'ctc_asc' | 'ctc_desc' | 'notice_asc'
+  const [stageFilter, setStageFilter] = useState('all'); // 'all' | 'screening' | 'shortlisted' | 'interviewing' | 'offer' | 'hired' | 'rejected'
+  const [verdictFilter, setVerdictFilter] = useState('all'); // 'all' | 'Shortlisted' | 'Borderline' | 'Not a fit'
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   
   // Slide-out Drawer active candidate profile and tabs
   const [activeDrawerCandidateId, setActiveDrawerCandidateId] = useState(null);
@@ -960,7 +1154,7 @@ Requirements:
   const [interviewDateTime, setInterviewDateTime] = useState('');
   const [interviewAgenda, setInterviewAgenda] = useState('Technical Screening & Coding Evaluation');
   
-  // PyjamaHR Collaborative Ratings and Careers Page preview states
+  // RecruiterPro Collaborative Ratings and Careers Page preview states
   const [activeCollaborator, setActiveCollaborator] = useState('recruiter'); // 'recruiter' | 'technical' | 'hr'
   const [isCareersPreviewOpen, setIsCareersPreviewOpen] = useState(false);
   const [appFormName, setAppFormName] = useState('');
@@ -1020,7 +1214,7 @@ Requirements:
   const [newJobDesc, setNewJobDesc] = useState('');
   const [newJobMustHaves, setNewJobMustHaves] = useState('');
 
-  // Additional PyjamaHR Extension States
+  // Additional RecruiterPro Extension States
   const [activeSkillFilters, setActiveSkillFilters] = useState([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [newNoteCategory, setNewNoteCategory] = useState('Recruiter Note');
@@ -1029,6 +1223,7 @@ Requirements:
   const [tempBody, setTempBody] = useState('');
   const [careersTheme, setCareersTheme] = useState('indigo');
   const [careersFont, setCareersFont] = useState('sans');
+  const [activeSidebarTab, setActiveSidebarTab] = useState('candidates');
 
   const tempSubjectRef = useRef(null);
   const tempBodyRef = useRef(null);
@@ -1254,7 +1449,73 @@ Requirements:
 
   // Extension Features States
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'kanban'
+  const [isCandidateAuthOpen, setIsCandidateAuthOpen] = useState(false);
+  const [candidateAuthMode, setCandidateAuthMode] = useState('login'); // 'login' | 'register'
+  const [candidateEmail, setCandidateEmail] = useState('');
+  const [candidatePassword, setCandidatePassword] = useState('');
+  const [candidateAuthError, setCandidateAuthError] = useState(null);
+  const [candidateAuthLoading, setCandidateAuthLoading] = useState(false);
+  const [selectedJobForApplication, setSelectedJobForApplication] = useState(null);
+  const [candidateAppliedText, setCandidateAppliedText] = useState('');
+  const [offerSalaryLpa, setOfferSalaryLpa] = useState('15');
+  const [offerJoiningDate, setOfferJoiningDate] = useState('');
+  const [offerNotes, setOfferNotes] = useState('');
+  const [activeOfferCandidateId, setActiveOfferCandidateId] = useState(null);
+  const [isGeneratingOffer, setIsGeneratingOffer] = useState(false);
+  const [candidateSignature, setCandidateSignature] = useState('');
+  const [isOfferSigned, setIsOfferSigned] = useState(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantMessages, setAssistantMessages] = useState([
+    {
+      sender: 'assistant',
+      text: "Hi! I'm your RecruitPro AI Assistant. Ask me to find the best candidate, filter by specific skills, list immediate joiners, or summarize a resume!",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
   const [expandedResumeIds, setExpandedResumeIds] = useState([]);
+  // Candidate Portal Navigation
+  const [activeCandidateNavTab, setActiveCandidateNavTab] = useState('dashboard');
+  const [savedJobIds, setSavedJobIds] = useState([]);
+  const [candidateAIMessages, setCandidateAIMessages] = useState([
+    { sender: 'ai', text: "Hi! I'm your AI Career Assistant. I can help you with interview prep, resume tips, career guidance, and job recommendations. What would you like help with today?" }
+  ]);
+  const [candidateAIInput, setCandidateAIInput] = useState('');
+  const [candidateProfileData, setCandidateProfileData] = useState({
+    fullName: '', phone: '', location: '', headline: '', skills: '', education: '', experience: '', bio: ''
+  });
+
+  useEffect(() => {
+    if (session && session.user && session.user.email !== 'admink338@gmail.com') {
+      const meta = session.user.user_metadata || {};
+      if (meta.candidateProfileData) setCandidateProfileData(meta.candidateProfileData);
+      if (meta.savedJobIds) setSavedJobIds(meta.savedJobIds);
+      if (meta.candidateAIMessages) setCandidateAIMessages(meta.candidateAIMessages);
+    }
+  }, [session]);
+
+  const saveCandidateMetadata = async (profile, savedJobs, chatMessages) => {
+    if (!session || !session.user) return;
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          candidateProfileData: profile || candidateProfileData,
+          savedJobIds: savedJobs || savedJobIds,
+          candidateAIMessages: chatMessages || candidateAIMessages
+        }
+      });
+      if (error) throw error;
+      if (data && data.user) {
+        setSession(prev => {
+          if (!prev) return prev;
+          return { ...prev, user: data.user };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to save candidate metadata:", err.message);
+    }
+  };
+
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('interview_invitation');
   const [searchQuery, setSearchQuery] = useState('');
@@ -2902,6 +3163,138 @@ Requirements:
                   )}
                 </div>
 
+                {/* ─── JD Requirements Gate ─── */}
+                {(evalData.must_have_results?.length > 0 || evalData.gate_status) && (
+                  <div className="card" style={{ padding: 0, overflow: 'hidden', border: `2px solid ${
+                    evalData.gate_status === 'pass' ? 'var(--color-sage)' :
+                    evalData.gate_status === 'partial' ? 'var(--color-gold)' :
+                    'var(--color-terracotta)'
+                  }` }}>
+                    {/* Gate Header Banner */}
+                    <div style={{
+                      padding: '0.65rem 1rem',
+                      background: evalData.gate_status === 'pass'
+                        ? 'linear-gradient(90deg, var(--color-sage-light, #edf7ee), transparent)'
+                        : evalData.gate_status === 'partial'
+                          ? 'linear-gradient(90deg, var(--color-gold-light, #fef9ec), transparent)'
+                          : 'linear-gradient(90deg, rgba(200,80,60,0.08), transparent)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      borderBottom: '1px solid var(--color-border)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        {evalData.gate_status === 'pass'
+                          ? <span style={{ fontSize: '1rem' }}>✅</span>
+                          : evalData.gate_status === 'partial'
+                            ? <span style={{ fontSize: '1rem' }}>⚠️</span>
+                            : <span style={{ fontSize: '1rem' }}>🚫</span>
+                        }
+                        <span style={{ fontSize: '0.78rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.06em',
+                          color: evalData.gate_status === 'pass' ? 'var(--color-sage)' : evalData.gate_status === 'partial' ? 'var(--color-gold)' : 'var(--color-terracotta)'
+                        }}>
+                          JD Requirements Gate — {
+                            evalData.gate_status === 'hard_fail' ? 'Hard Fail (Score Capped)' :
+                            evalData.gate_status === 'soft_fail' ? 'Soft Fail (Score Capped)' :
+                            evalData.gate_status === 'partial'   ? 'Partial Pass (Minor Gaps)' :
+                            'All Requirements Met'
+                          }
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.72rem', fontWeight: '700', fontFamily: 'var(--font-mono)',
+                        padding: '0.2rem 0.5rem', borderRadius: '20px',
+                        background: evalData.gate_status === 'pass' ? 'var(--color-sage)' : evalData.gate_status === 'partial' ? 'var(--color-gold)' : 'var(--color-terracotta)',
+                        color: '#fff'
+                      }}>
+                        {evalData.must_have_met ?? 0}/{evalData.must_have_total ?? 0} Must-Haves
+                      </span>
+                    </div>
+
+                    {/* Gate Reason */}
+                    {evalData.gate_reason && (
+                      <div style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--color-ink-muted)', borderBottom: '1px solid var(--color-border)', fontStyle: 'italic' }}>
+                        {evalData.gate_reason}
+                      </div>
+                    )}
+
+                    {/* Must-Have Checklist */}
+                    {evalData.must_have_results?.length > 0 && (
+                      <div style={{ padding: '0.75rem 1rem' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: '700', color: 'var(--color-ink-muted)', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                          Must-Have Requirements Check
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {evalData.must_have_results.map((req, idx) => (
+                            <div key={idx} style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '0.35rem 0.5rem', borderRadius: '6px',
+                              background: req.met ? 'rgba(72,172,94,0.07)' : 'rgba(200,80,60,0.07)',
+                              border: `1px solid ${req.met ? 'rgba(72,172,94,0.2)' : 'rgba(200,80,60,0.2)'}`,
+                              gap: '0.5rem'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: '0.85rem', flexShrink: 0 }}>{req.met ? '✅' : '❌'}</span>
+                                <span style={{ fontSize: '0.78rem', fontWeight: '600', color: req.met ? 'var(--color-sage)' : 'var(--color-terracotta)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {req.label}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--color-ink-muted)', flexShrink: 0, fontStyle: 'italic' }}>
+                                {req.reason}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Experience Comparison Bar */}
+                    {(evalData.candidate_years !== undefined && evalData.required_years !== undefined) && (
+                      <div style={{ padding: '0.5rem 1rem 0.75rem', borderTop: '1px solid var(--color-border)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <span style={{ fontSize: '0.7rem', fontWeight: '700', color: 'var(--color-ink-muted)', textTransform: 'uppercase' }}>
+                            Experience vs Requirement
+                          </span>
+                          <span style={{ fontSize: '0.72rem', fontWeight: '700', fontFamily: 'var(--font-mono)',
+                            color: evalData.candidate_years >= evalData.required_years ? 'var(--color-sage)' : 'var(--color-terracotta)' }}>
+                            {evalData.candidate_years} yrs / {evalData.required_years}+ required
+                            {evalData.candidate_years >= evalData.required_years ? ' ✓' : ` (${evalData.required_years - evalData.candidate_years} yr gap)`}
+                          </span>
+                        </div>
+                        <div style={{ background: 'var(--color-border)', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: '4px',
+                            width: `${Math.min(100, (evalData.candidate_years / Math.max(evalData.required_years, 1)) * 100)}%`,
+                            background: evalData.candidate_years >= evalData.required_years ? 'var(--color-sage)' : 'var(--color-terracotta)',
+                            transition: 'width 0.8s ease-in-out'
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Fate Decision Footer */}
+                    <div style={{
+                      padding: '0.6rem 1rem',
+                      background: evalData.gate_status === 'pass'
+                        ? 'rgba(72,172,94,0.1)'
+                        : evalData.gate_status === 'partial'
+                          ? 'rgba(192,154,85,0.1)'
+                          : 'rgba(200,80,60,0.1)',
+                      borderTop: '1px solid var(--color-border)',
+                      display: 'flex', alignItems: 'center', gap: '0.5rem'
+                    }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-ink-muted)' }}>Fate Decision:</span>
+                      <span style={{ fontSize: '0.78rem', fontWeight: '700',
+                        color: evalData.gate_status === 'pass' ? 'var(--color-sage)' : evalData.gate_status === 'partial' ? 'var(--color-gold)' : 'var(--color-terracotta)'
+                      }}>
+                        {evalData.gate_status === 'hard_fail' ? '🚫 Decline Recommended — Critical requirements not met'
+                          : evalData.gate_status === 'soft_fail' ? '⚠️ Phone Screen Recommended — Multiple gaps to clarify'
+                          : evalData.gate_status === 'partial'   ? '📋 Conditional Shortlist — Minor gaps, verify in interview'
+                          : '✅ Proceed to Interview — Meets all requirements'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="card" style={{ padding: '1rem', backgroundColor: 'var(--color-white)' }}>
                   <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.75rem', color: 'var(--color-ink-muted)' }}>Screening Metrics</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem 1.5rem', fontSize: '0.85rem' }}>
@@ -2931,6 +3324,8 @@ Requirements:
                     </div>
                   </div>
                 </div>
+
+                {renderRadarChart(evalData.subscores)}
 
                 <div className="card" style={{ padding: '1rem' }}>
                   <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', marginBottom: '0.75rem', color: 'var(--color-ink-muted)' }}>Score Card Dimensions</h4>
@@ -3109,6 +3504,85 @@ Requirements:
                       />
                     </div>
                   </div>
+
+                  {/* Recruiter Offer Generator (Only displayed if stage is 'offer' or 'offer_extended') */}
+                  {(candidate.stage === 'offer' || candidate.stage === 'offer_extended') && (
+                    <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', border: '1px solid var(--color-terracotta)', backgroundColor: 'var(--color-paper-light)', marginTop: '1rem' }}>
+                      <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-terracotta)', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.25rem', margin: 0 }}>
+                        ✍️ Recruiter Offer Generator
+                      </h4>
+                      <p className="text-xs text-muted" style={{ margin: 0 }}>This candidate has reached the Offer stage. Specify salary and joining terms to generate and extend the formal offer letter.</p>
+                      
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label text-xs">Salary Package (LPA)</label>
+                          <input 
+                            type="number" 
+                            className="input-text text-sm" 
+                            value={offerSalaryLpa}
+                            onChange={(e) => setOfferSalaryLpa(e.target.value)}
+                          />
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                          <label className="form-label text-xs">Target Joining Date</label>
+                          <input 
+                            type="date" 
+                            className="input-text text-sm" 
+                            value={offerJoiningDate}
+                            onChange={(e) => setOfferJoiningDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label text-xs">Offer Clauses / Benefits Notes</label>
+                        <textarea 
+                          className="input-textarea text-sm" 
+                          style={{ minHeight: '80px' }}
+                          placeholder="e.g. Standard health coverage, 20 days paid leave, remote eligible, signing bonus..."
+                          value={offerNotes}
+                          onChange={(e) => setOfferNotes(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ alignSelf: 'flex-start', width: 'auto', padding: '0.5rem 1.25rem', fontSize: '0.82rem', backgroundColor: 'var(--color-terracotta)', cursor: 'pointer' }}
+                        onClick={() => {
+                          if (!offerJoiningDate) {
+                            alert("Please select a target joining date.");
+                            return;
+                          }
+                          const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          const updatedLog = [...(candidate.activityLog || [])];
+                          updatedLog.push({
+                            id: updatedLog.length + 1,
+                            type: 'offer_extended',
+                            text: `📝 Job Offer Extended: Salary: ${offerSalaryLpa} LPA, Join Date: ${offerJoiningDate}`,
+                            timestamp: timeStr
+                          });
+                          updateCandidateJobData(candidate.id, {
+                            stage: 'offer_extended',
+                            offerDetails: {
+                              salaryLpa: offerSalaryLpa,
+                              joiningDate: offerJoiningDate,
+                              notes: offerNotes,
+                              extendedAt: timeStr
+                            },
+                            evaluation: candidate.evaluation ? {
+                              ...candidate.evaluation,
+                              activity_log: updatedLog
+                            } : null,
+                            activityLog: updatedLog
+                          });
+                          alert("🎉 Formal job offer extended to candidate successfully!");
+                        }}
+                      >
+                        {candidate.stage === 'offer_extended' ? 'Update & Re-extend Offer' : 'Generate & Extend Offer'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -3717,53 +4191,31 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
   const renderCareersPreviewModal = () => {
     if (!isCareersPreviewOpen) return null;
+
+    let primaryColor = '#4F46E5';
+    let hoverColor = '#4338CA';
+    let lightColor = '#EEF2F6';
     
-    const skillsList = mustHaves ? mustHaves.split(',').map(s => s.trim()).filter(Boolean) : ['React', 'TypeScript', 'Sass'];
-    
-    const handleMockSubmit = (e) => {
-      e.preventDefault();
-      if (!appFormName || !appFormEmail || !appFormResume) {
-        alert("Please fill in all fields.");
-        return;
-      }
-      
-      const candidateId = Math.random().toString(36).substring(7);
-      const newCandidate = {
-        id: candidateId,
-        name: appFormName,
-        fileName: 'Careers_Portal_Submission.txt',
-        fileSize: appFormResume.length,
-        status: 'ready',
-        ocrProgress: 0,
-        text: `${appFormName}\nEmail: ${appFormEmail}\n\nResume Details:\n${appFormResume}`,
-        numChars: appFormResume.length,
-        errorDetails: '',
-        score: null,
-        evaluation: null,
-        stage: 'screening',
-        activityLog: [
-          { id: 1, type: "applied", text: "Candidate applied directly via public careers portal", timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
-        ]
-      };
-      
-      setCandidates(prev => [...prev, newCandidate]);
-      setAppSubmitted(true);
-      setTimeout(() => {
-        setAppFormName('');
-        setAppFormEmail('');
-        setAppFormResume('');
-        setAppSubmitted(false);
-        setIsCareersPreviewOpen(false);
-        alert(`🎉 Application submitted! ${appFormName} has been added to your screening queue.`);
-      }, 1500);
-    };
-    
+    if (careersTheme === 'emerald') {
+      primaryColor = '#10B981';
+      hoverColor = '#059669';
+      lightColor = '#ECFDF5';
+    } else if (careersTheme === 'terracotta') {
+      primaryColor = '#C85A32';
+      hoverColor = '#AF4B27';
+      lightColor = '#F9EFEA';
+    }
+
+    let fontStyle = 'var(--font-body)';
+    if (careersFont === 'serif') fontStyle = 'var(--font-display)';
+    else if (careersFont === 'mono') fontStyle = 'var(--font-mono)';
+
     return (
       <div className="modal-backdrop">
-        <div className="modal-content careers-preview-modal" style={{ width: '950px', maxWidth: '95vw', height: '650px', maxHeight: '90vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div className="modal-content careers-preview-modal" style={{ width: '980px', maxWidth: '95vw', height: '650px', maxHeight: '90vh', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div className="careers-header" style={{ background: 'linear-gradient(135deg, #1E293B, #0F172A)', color: '#F8FAFC', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <span className="text-xs" style={{ textTransform: 'uppercase', color: 'var(--color-terracotta)', fontWeight: 'bold' }}>Live Careers Page Preview</span>
+              <span className="text-xs" style={{ textTransform: 'uppercase', color: primaryColor, fontWeight: 'bold' }}>Live Careers Page Preview</span>
               <h3 style={{ color: '#F8FAFC', fontSize: '1.25rem', margin: 0 }}>Acme Corp Jobs Portal</h3>
             </div>
             <button 
@@ -3776,11 +4228,10 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           </div>
 
           <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            {/* Left Side: Customizer Controls */}
+            {/* Customizer Sidebar */}
             <div className="careers-customizer-sidebar" style={{ width: '250px', borderRight: '1px solid var(--color-border)', backgroundColor: 'var(--color-paper-darker)', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', overflowY: 'auto' }}>
               <span style={{ fontWeight: '800', fontSize: '0.82rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Site Styles Customizer</span>
               
-              {/* Theme Selector */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label className="form-label text-xs">Color Scheme</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -3794,18 +4245,10 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                       type="button"
                       onClick={() => setCareersTheme(thm.id)}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.5rem 0.75rem',
+                        display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem',
                         border: '1px solid ' + (careersTheme === thm.id ? thm.color : 'var(--color-border)'),
-                        borderRadius: '6px',
-                        background: careersTheme === thm.id ? 'var(--color-white)' : 'none',
-                        color: 'var(--color-ink)',
-                        cursor: 'pointer',
-                        fontWeight: careersTheme === thm.id ? 'bold' : 'normal',
-                        fontSize: '0.8rem',
-                        textAlign: 'left'
+                        borderRadius: '6px', background: careersTheme === thm.id ? 'var(--color-white)' : 'none',
+                        color: 'var(--color-ink)', cursor: 'pointer', fontWeight: careersTheme === thm.id ? 'bold' : 'normal', fontSize: '0.8rem', textAlign: 'left'
                       }}
                     >
                       <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: thm.color, display: 'inline-block' }} />
@@ -3815,7 +4258,6 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 </div>
               </div>
 
-              {/* Font Selector */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <label className="form-label text-xs">Typography Font</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -3829,16 +4271,9 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                       type="button"
                       onClick={() => setCareersFont(fnt.id)}
                       style={{
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid ' + (careersFont === fnt.id ? 'var(--color-terracotta)' : 'var(--color-border)'),
-                        borderRadius: '6px',
-                        background: careersFont === fnt.id ? 'var(--color-white)' : 'none',
-                        color: 'var(--color-ink)',
-                        cursor: 'pointer',
-                        fontWeight: careersFont === fnt.id ? 'bold' : 'normal',
-                        fontSize: '0.8rem',
-                        fontFamily: fnt.family,
-                        textAlign: 'left'
+                        padding: '0.5rem 0.75rem', border: '1px solid ' + (careersFont === fnt.id ? 'var(--color-terracotta)' : 'var(--color-border)'),
+                        borderRadius: '6px', background: careersFont === fnt.id ? 'var(--color-white)' : 'none',
+                        color: 'var(--color-ink)', cursor: 'pointer', fontWeight: careersFont === fnt.id ? 'bold' : 'normal', fontSize: '0.8rem', fontFamily: fnt.family, textAlign: 'left'
                       }}
                     >
                       {fnt.name}
@@ -3848,136 +4283,65 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
               </div>
             </div>
 
-            {/* Right Side: Active Careers Site */}
-            {(() => {
-              let primaryColor = '#4F46E5';
-              let hoverColor = '#4338CA';
-              let lightColor = '#EEF2F6';
-              
-              if (careersTheme === 'emerald') {
-                primaryColor = '#10B981';
-                hoverColor = '#059669';
-                lightColor = '#ECFDF5';
-              } else if (careersTheme === 'terracotta') {
-                primaryColor = '#C85A32';
-                hoverColor = '#AF4B27';
-                lightColor = '#F9EFEA';
-              }
-
-              let fontStyle = 'var(--font-body)';
-              if (careersFont === 'serif') {
-                fontStyle = 'var(--font-display)';
-              } else if (careersFont === 'mono') {
-                fontStyle = 'var(--font-mono)';
-              }
-
-              return (
-                <div 
-                  className="scroll-container" 
-                  style={{
-                    flex: 1,
-                    padding: '2rem',
-                    overflowY: 'auto',
-                    backgroundColor: 'var(--color-white)',
-                    fontFamily: fontStyle,
-                    color: 'var(--color-ink)'
-                  }}
-                >
-                  {appSubmitted ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem', textAlign: 'center', padding: '3rem 1rem' }}>
-                      <div className="success-checkmark-circle" style={{ borderColor: primaryColor }}>
-                        <Check size={36} style={{ color: primaryColor }} />
-                      </div>
-                      <h4 style={{ fontSize: '1.5rem', color: primaryColor }}>Submitting Application...</h4>
-                      <p className="text-sm text-muted">Simulating career site API transmission & ATS processing</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <h2 style={{ fontSize: '1.6rem', marginBottom: '0.5rem', color: primaryColor }}>{jobTitle}</h2>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-                          <span className="candidate-verdict shortlisted" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--color-paper-darker)', color: 'var(--color-ink)', border: '1px solid var(--color-border)' }}>📍 Bangalore, IN</span>
-                          <span className="candidate-verdict shortlisted" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--color-paper-darker)', color: 'var(--color-ink)', border: '1px solid var(--color-border)' }}>💰 Competitive Salary</span>
-                          <span className="candidate-verdict shortlisted" style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--color-paper-darker)', color: 'var(--color-ink)', border: '1px solid var(--color-border)' }}>💼 Full-Time</span>
-                        </div>
-                        
-                        <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: '0.5rem' }}>Required Key Skills</h4>
-                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
-                          {skillsList.map((skill, idx) => (
-                            <span key={idx} className="keyword-chip matched" style={{ fontSize: '0.7rem', padding: '0.15rem 0.45rem', backgroundColor: lightColor, color: primaryColor, borderColor: 'rgba(0,0,0,0.05)' }}>{skill}</span>
-                          ))}
-                        </div>
-                        
-                        <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: '0.5rem' }}>Job Details</h4>
-                        <div style={{ backgroundColor: 'var(--color-paper-light)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '1rem', maxHeight: '150px', overflowY: 'auto', marginBottom: '1.5rem' }}>
-                          <pre style={{ fontFamily: 'inherit', fontSize: '0.82rem', whiteSpace: 'pre-wrap', color: 'var(--color-ink-light)', margin: 0 }}>
-                            {jobDescription}
-                          </pre>
-                        </div>
-                      </div>
-                      
-                      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: primaryColor }}>Submit Application</h3>
-                        <form onSubmit={handleMockSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label text-xs">Full Name</label>
-                              <input 
-                                type="text" 
-                                className="input-text text-sm" 
-                                placeholder="e.g. Jane Doe"
-                                value={appFormName}
-                                onChange={(e) => setAppFormName(e.target.value)}
-                                required
-                              />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label className="form-label text-xs">Email Address</label>
-                              <input 
-                                type="email" 
-                                className="input-text text-sm" 
-                                placeholder="e.g. jane.doe@example.com"
-                                value={appFormEmail}
-                                onChange={(e) => setAppFormEmail(e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label className="form-label text-xs">Resume Profile Text (Paste Resume Details)</label>
-                            <textarea 
-                              className="input-textarea text-sm" 
-                              placeholder="Paste resume text or skills bio here..."
-                              style={{ minHeight: '80px' }}
-                              value={appFormResume}
-                              onChange={(e) => setAppFormResume(e.target.value)}
-                              required
-                            />
-                          </div>
-                          
-                          <button
-                            type="submit"
-                            className="btn-primary"
-                            style={{ 
-                              marginTop: '0.5rem', 
-                              width: 'auto', 
-                              alignSelf: 'flex-start', 
-                              padding: '0.55rem 1.5rem', 
-                              fontSize: '0.85rem',
-                              background: `linear-gradient(135deg, ${primaryColor}, ${hoverColor})`,
-                              boxShadow: `0 4px 10px rgba(0,0,0,0.05)`
-                            }}
-                          >
-                            Submit Mock Application
-                          </button>
-                        </form>
-                      </div>
-                    </>
-                  )}
+            {/* Careers board listings */}
+            <div className="scroll-container" style={{ flex: 1, padding: '2rem', overflowY: 'auto', backgroundColor: '#FFFFFF', fontFamily: fontStyle, color: '#1E293B' }}>
+              <div style={{ borderBottom: '1px solid #E2E8F0', paddingBottom: '1rem', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', color: '#0F172A', margin: 0 }}>Acme Corp Active Openings</h2>
+                  <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: '#64748b' }}>Explore current roles and submit your application.</p>
                 </div>
-              );
-            })()}
+                {session ? (
+                  <span style={{ fontSize: '0.8rem', color: primaryColor }}>Logged in as: <strong>{session.user.email}</strong></span>
+                ) : (
+                  <button
+                    type="button"
+                    style={{ padding: '0.45rem 1rem', border: `1.5px solid ${primaryColor}`, background: 'none', color: primaryColor, cursor: 'pointer', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}
+                    onClick={() => {
+                      setCandidateAuthMode('login');
+                      setIsCandidateAuthOpen(true);
+                    }}
+                  >
+                    Candidate Login
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                {jobs.map(job => (
+                  <div key={job.id} style={{ border: '1px solid #E2E8F0', borderRadius: '8px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#0F172A' }}>{job.title}</h3>
+                      <button
+                        type="button"
+                        style={{ padding: '0.5rem 1.25rem', backgroundColor: primaryColor, color: '#FFF', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.82rem' }}
+                        onClick={() => {
+                          if (session) {
+                            setSelectedJobForApplication(job);
+                            setIsCareersPreviewOpen(false);
+                          } else {
+                            setSelectedJobForApplication(job);
+                            setCandidateAuthMode('register');
+                            setIsCandidateAuthOpen(true);
+                          }
+                        }}
+                      >
+                        Apply Now
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: '#F1F5F9', color: '#475569', borderRadius: '4px' }}>📍 Bangalore, IN</span>
+                      <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: '#F1F5F9', color: '#475569', borderRadius: '4px' }}>💼 Full-Time</span>
+                      <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: '#F1F5F9', color: '#475569', borderRadius: '4px' }}>💰 Competitive package</span>
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '0.75rem 1rem', borderRadius: '6px', fontSize: '0.82rem', color: '#334155' }}>
+                      <pre style={{ fontFamily: 'inherit', margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>{job.description}</pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           
           <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--color-border)', background: 'var(--color-paper-darker)', textAlign: 'right' }}>
@@ -4027,29 +4391,42 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
   const kpis = calculateKpis();
   
-  // Sorted and Filtered results (highest score first)
+  // Sorted and Filtered results
+  const NOTICE_ORDER = { 'Immediate': 0, '15 days': 1, '30 days': 2, '60 days': 3, '90 days': 4 };
+
   const completedCandidates = enrichedCandidates
     .filter(c => {
+      // Always show in-progress and failed statuses
       if (c.status === 'screening' || c.status === 'failed') return true;
       if (c.status !== 'completed') return false;
       
       const dispScore = getCandidateDisplayScore(c);
-      
-      // Filter by min score threshold
+      const outcome = getNextStepDetails(dispScore, threshold);
+
+      // 1. Verdict filter (Shortlisted / Borderline / Not a fit)
+      if (verdictFilter !== 'all' && outcome.badge !== verdictFilter) return false;
+
+      // 2. Stage filter
+      const candStage = c.stage || 'screening';
+      if (stageFilter !== 'all' && candStage !== stageFilter) return false;
+
+      // 3. Minimum ATS score
       if (dispScore < minScoreFilter) return false;
       
-      // Filter by salary budget
+      // 4. Max expected CTC
       const expectedCtc = c.evaluation?.expected_ctc || c.expectedCtc || 0;
       if (expectedCtc > maxExpectedCtc) return false;
       
-      // Filter by notice period
+      // 5. Notice period filter
       const np = c.evaluation?.notice_period || c.noticePeriod || 'any';
       if (noticePeriodFilter !== 'any') {
         if (noticePeriodFilter === 'immediate' && np !== 'Immediate') return false;
+        if (noticePeriodFilter === '15' && np !== 'Immediate' && np !== '15 days') return false;
         if (noticePeriodFilter === '30' && np !== 'Immediate' && np !== '15 days' && np !== '30 days') return false;
+        if (noticePeriodFilter === '60' && np !== 'Immediate' && np !== '15 days' && np !== '30 days' && np !== '60 days') return false;
       }
       
-      // Filter by location
+      // 6. Location filter
       if (locationFilter.trim() !== '') {
         const locQuery = locationFilter.toLowerCase();
         const candLoc = (c.evaluation?.location || c.location || '').toLowerCase();
@@ -4057,7 +4434,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         if (!candLoc.includes(locQuery) && !candPrefLoc.includes(locQuery)) return false;
       }
 
-      // Filter by active skill cloud filters
+      // 7. Skill cloud filters (must match ALL selected skills)
       if (activeSkillFilters.length > 0) {
         const candidateTextLower = (c.text || '').toLowerCase();
         const matchesAllSkills = activeSkillFilters.every(skill => {
@@ -4073,686 +4450,1967 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         if (!matchesAllSkills) return false;
       }
       
-      // Filter by search text query
+      // 8. Free-text search (name, email, resume text)
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         const candidateName = (c.evaluation?.candidate_name || c.name || '').toLowerCase();
         const email = extractEmail(c).toLowerCase();
         const text = (c.text || '').toLowerCase();
-        return candidateName.includes(query) || email.includes(query) || text.includes(query);
+        if (!candidateName.includes(query) && !email.includes(query) && !text.includes(query)) return false;
       }
       
       return true;
     })
     .sort((a, b) => {
+      // Always put in-progress statuses at top
       if (a.status === 'screening') return -1;
       if (b.status === 'screening') return 1;
-      return (getCandidateDisplayScore(b) || 0) - (getCandidateDisplayScore(a) || 0);
+      if (a.status === 'failed') return 1;
+      if (b.status === 'failed') return -1;
+
+      const aScore = getCandidateDisplayScore(a) || 0;
+      const bScore = getCandidateDisplayScore(b) || 0;
+      const aCtc = a.evaluation?.expected_ctc || a.expectedCtc || 0;
+      const bCtc = b.evaluation?.expected_ctc || b.expectedCtc || 0;
+      const aNp = a.evaluation?.notice_period || a.noticePeriod || '90 days';
+      const bNp = b.evaluation?.notice_period || b.noticePeriod || '90 days';
+      const aName = (a.evaluation?.candidate_name || a.name || '').toLowerCase();
+      const bName = (b.evaluation?.candidate_name || b.name || '').toLowerCase();
+
+      switch (sortBy) {
+        case 'score_asc':   return aScore - bScore;
+        case 'name_asc':    return aName.localeCompare(bName);
+        case 'name_desc':   return bName.localeCompare(aName);
+        case 'ctc_asc':     return aCtc - bCtc;
+        case 'ctc_desc':    return bCtc - aCtc;
+        case 'notice_asc':  return (NOTICE_ORDER[aNp] ?? 5) - (NOTICE_ORDER[bNp] ?? 5);
+        case 'score_desc':  // fallthrough
+        default:            return bScore - aScore;
+      }
     });
 
   const completedScoredCandidates = completedCandidates.filter(c => c.status === 'completed');
 
-  return (
-    <div className="app-container">
-      {/* 1. SETUP PANEL (LEFT COLUMN) */}
-      <aside className="sidebar">
-        <div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>RecruitPro ATS</h2>
-          <p className="text-xs text-muted" style={{ fontStyle: 'italic' }}>
-            Executive Recruitment Tool
-          </p>
-        </div>
+  const renderRadarChart = (subscores = {}) => {
+    const cx = 150;
+    const cy = 135;
+    const r = 90;
+    const axes = [
+      { key: 'Must-Haves', label: 'Must-Haves' },
+      { key: 'JD Skills', label: 'JD Skills' },
+      { key: 'Experience', label: 'Experience' },
+      { key: 'Education', label: 'Education' },
+      { key: 'Resume Quality', label: 'Resume Quality' },
+      { key: 'Growth', label: 'Growth' }
+    ];
 
-        {/* Job openings selector dropdown card */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-            Active Job Opening
-          </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <select
-              className="input-text text-sm"
-              style={{ padding: '0.55rem 0.75rem', height: 'auto', border: '1px solid var(--color-border)', flex: 1 }}
-              value={activeJobId}
-              onChange={(e) => handleSelectJob(e.target.value)}
-            >
-              {jobs.map(job => (
-                <option key={job.id} value={job.id}>{job.title}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="btn-primary"
-              style={{ width: 'auto', padding: '0.55rem 0.75rem', fontSize: '0.85rem' }}
-              onClick={() => setIsJobModalOpen(true)}
-              title="Create New Job Opening"
-            >
-              +
-            </button>
-          </div>
-        </div>
+    const getCoordinates = (index, value, maxVal = 100) => {
+      const angle = index * (2 * Math.PI / axes.length) - Math.PI / 2;
+      const radius = (value / maxVal) * r;
+      return {
+        x: Math.round(cx + radius * Math.cos(angle)),
+        y: Math.round(cy + radius * Math.sin(angle))
+      };
+    };
 
-        {/* WORKFLOW 1: Job Specification */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-            <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              1. Job Details
-            </span>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
-              onClick={() => jdFileInputRef.current?.click()}
-            >
-              <Upload size={12} /> Upload JD
-            </button>
-            <input 
-              type="file" 
-              ref={jdFileInputRef} 
-              style={{ display: 'none' }} 
-              accept=".pdf,.docx,.txt"
-              onChange={handleJdFileUpload} 
+    const gridLevels = [20, 40, 60, 80, 100];
+    const gridPolygons = gridLevels.map(level => {
+      return axes.map((_, index) => {
+        const coords = getCoordinates(index, level);
+        return `${coords.x},${coords.y}`;
+      }).join(' ');
+    });
+
+    const candidatePoints = axes.map((axis, index) => {
+      const val = subscores[axis.key] ?? 50;
+      const coords = getCoordinates(index, val);
+      return `${coords.x},${coords.y}`;
+    }).join(' ');
+
+    return (
+      <div className="radar-chart-card animate-fade-in" style={{ width: '100%' }}>
+        <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-ink-light)' }}>
+          Scorecard Radar Breakdown
+        </h4>
+        <svg width="300" height="260" className="radar-chart-svg">
+          {gridPolygons.map((points, i) => (
+            <polygon 
+              key={i} 
+              points={points} 
+              className="radar-grid-line" 
+              style={{ strokeWidth: i === 4 ? '1.5px' : '1px' }}
             />
-          </div>
+          ))}
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Job Title</label>
-            <input 
-              type="text" 
-              className="input-text" 
-              placeholder="e.g. Lead Software Engineer"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-            />
-          </div>
+          {axes.map((_, index) => {
+            const outer = getCoordinates(index, 100);
+            return (
+              <line 
+                key={index} 
+                x1={cx} 
+                y1={cy} 
+                x2={outer.x} 
+                y2={outer.y} 
+                className="radar-axis-line" 
+              />
+            );
+          })}
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Job Description</label>
-            <textarea 
-              className="input-textarea" 
-              style={{ minHeight: '120px' }}
-              placeholder="Paste job description details..."
-              value={jobDescription}
-              onChange={(e) => setJobDescription(e.target.value)}
-            />
-          </div>
+          <polygon points={candidatePoints} className="radar-polygon" />
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Must-Haves / Specs (Optional)</label>
-            <textarea 
-              className="input-textarea" 
-              style={{ minHeight: '80px' }}
-              placeholder="e.g. 5+ years React, AWS cert, system design..."
-              value={mustHaves}
-              onChange={(e) => setMustHaves(e.target.value)}
-            />
-          </div>
-        </div>
+          {axes.map((axis, index) => {
+            const val = subscores[axis.key] ?? 50;
+            const outer = getCoordinates(index, 118);
+            const dot = getCoordinates(index, val);
+            const scoreLabelCoords = getCoordinates(index, 134);
+            
+            let textAnchor = 'middle';
+            if (outer.x < cx - 10) textAnchor = 'end';
+            else if (outer.x > cx + 10) textAnchor = 'start';
 
-        {/* AI Job Description Optimizer Widget */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <div className="flex justify-between items-center" style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-            <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Sparkles size={14} style={{ color: 'var(--color-terracotta)' }} /> AI JD Generator
-            </span>
-          </div>
-          <span className="text-xs text-muted">Select a template to instantly generate optimized job descriptions and keywords:</span>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', justifyContent: 'center' }}
-              onClick={() => {
-                setJobTitle(JD_TEMPLATES.react_developer.title);
-                setJobDescription(JD_TEMPLATES.react_developer.description);
-                setMustHaves(JD_TEMPLATES.react_developer.mustHaves);
-              }}
-            >
-              React Dev
-            </button>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', justifyContent: 'center' }}
-              onClick={() => {
-                setJobTitle(JD_TEMPLATES.python_data_scientist.title);
-                setJobDescription(JD_TEMPLATES.python_data_scientist.description);
-                setMustHaves(JD_TEMPLATES.python_data_scientist.mustHaves);
-              }}
-            >
-              Data Scientist
-            </button>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', justifyContent: 'center' }}
-              onClick={() => {
-                setJobTitle(JD_TEMPLATES.product_manager.title);
-                setJobDescription(JD_TEMPLATES.product_manager.description);
-                setMustHaves(JD_TEMPLATES.product_manager.mustHaves);
-              }}
-            >
-              Product Mgr
-            </button>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ fontSize: '0.7rem', padding: '0.35rem 0.5rem', justifyContent: 'center' }}
-              onClick={() => {
-                setJobTitle(JD_TEMPLATES.qa_automation_engineer.title);
-                setJobDescription(JD_TEMPLATES.qa_automation_engineer.description);
-                setMustHaves(JD_TEMPLATES.qa_automation_engineer.mustHaves);
-              }}
-            >
-              QA Engineer
-            </button>
+            return (
+              <g key={index}>
+                <circle 
+                  cx={dot.x} 
+                  cy={dot.y} 
+                  r="4" 
+                  className="radar-dot" 
+                  title={`${axis.label}: ${val}`}
+                />
+                
+                <text 
+                  x={outer.x} 
+                  y={outer.y + 4} 
+                  className="radar-label"
+                  style={{ textAnchor }}
+                >
+                  {axis.label}
+                </text>
+                
+                <text 
+                  x={scoreLabelCoords.x} 
+                  y={scoreLabelCoords.y + 4} 
+                  className="radar-label-score"
+                  style={{ textAnchor }}
+                >
+                  {val}%
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  };
+
+  const renderAIAssistant = () => {
+    if (!isChatbotOpen) return null;
+    return (
+      <div className="ai-assistant-drawer" onClick={(e) => e.stopPropagation()}>
+        <div className="ai-assistant-header">
+          <div className="ai-assistant-title">
+            <Sparkles size={18} />
+            <span>RecruitPro AI</span>
           </div>
           <button 
             type="button" 
-            className="btn-primary" 
-            style={{ fontSize: '0.8rem', padding: '0.55rem 1rem', marginTop: '0.5rem', background: 'linear-gradient(135deg, var(--color-sage), var(--color-sage-hover))', boxShadow: 'none' }}
-            onClick={() => setIsCareersPreviewOpen(true)}
+            className="ai-assistant-close-btn"
+            onClick={() => setIsChatbotOpen(false)}
+            title="Close Assistant"
           >
-            👁 Preview Public Careers Page
+            <X size={16} />
           </button>
         </div>
 
-        {/* WORKFLOW 2: Candidates Upload & Pastes */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-            2. Candidates
-          </span>
+        <div className="ai-assistant-messages scroll-container">
+          {assistantMessages.map((msg, index) => (
+            <div key={index} className={`chat-bubble ${msg.sender}`}>
+              <div className="chat-text" style={{ whiteSpace: 'pre-wrap' }}>
+                {msg.text.split('**').map((chunk, i) => i % 2 === 1 ? <strong key={i}>{chunk}</strong> : chunk)}
+              </div>
+              <div className="chat-timestamp">{msg.timestamp}</div>
+            </div>
+          ))}
+        </div>
 
-          <div 
-            className={`dropzone ${dragActive ? 'active' : ''}`}
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            onClick={() => candidateFileInputRef.current?.click()}
-          >
-            <Upload size={24} style={{ color: 'var(--color-terracotta)' }} />
-            <p style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--color-ink-light)' }}>
-              Drag & drop résumés or <span style={{ color: 'var(--color-terracotta)', textDecoration: 'underline' }}>browse</span>
-            </p>
-            <p className="text-xs text-muted">Supports PDF, DOCX, TXT, PNG, JPG</p>
-            <input 
-              type="file" 
-              ref={candidateFileInputRef} 
-              style={{ display: 'none' }} 
-              multiple 
-              accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
-              onChange={handleBrowseFiles}
-            />
-          </div>
-
-          {/* Paste Fallback Collapsible */}
-          <div>
-            <button 
-              type="button" 
-              className="btn-secondary" 
-              style={{ width: '100%', justifyContent: 'space-between', fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
-              onClick={() => setPasteFallbackOpen(!pasteFallbackOpen)}
+        <div className="ai-assistant-suggestions">
+          {[
+            "Who is the best fit?",
+            "Show immediate joiners",
+            "Filter React skills",
+            "Summarize Rohan Mehta"
+          ].map((prompt, i) => (
+            <button
+              key={i}
+              type="button"
+              className="prompt-chip"
+              onClick={() => handleAssistantSubmit(null, prompt)}
             >
-              <span>Paste Résumé Text Alternative</span>
-              {pasteFallbackOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {prompt}
             </button>
+          ))}
+        </div>
 
-            {pasteFallbackOpen && (
-              <div className="file-fallback-box animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.50rem', marginTop: '0.50rem' }}>
-                <input 
-                  type="text" 
-                  className="input-text text-sm" 
-                  placeholder="Candidate Name"
-                  value={pasteName}
-                  onChange={(e) => setPasteName(e.target.value)}
-                />
-                <textarea 
-                  className="input-textarea text-sm" 
-                  style={{ minHeight: '100px' }}
-                  placeholder="Paste résumé text layer..."
-                  value={pasteText}
-                  onChange={(e) => setPasteText(e.target.value)}
-                />
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  style={{ padding: '0.5rem', fontSize: '0.8rem' }}
-                  onClick={handleAddManualCandidate}
-                  disabled={!pasteText.trim()}
-                >
-                  Add Candidate
-                </button>
+        <div className="ai-assistant-input-area">
+          <form onSubmit={handleAssistantSubmit} className="ai-assistant-input-form">
+            <input
+              type="text"
+              className="ai-assistant-text-input"
+              placeholder="Ask RecruitPro AI..."
+              value={assistantInput}
+              onChange={(e) => setAssistantInput(e.target.value)}
+            />
+            <button type="submit" className="ai-assistant-submit-btn">
+              <Send size={14} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCandidateDashboard = () => {
+
+    const handleApplySubmit = (e) => {
+      e.preventDefault();
+      if (!selectedJobForApplication || !candidateAppliedText.trim()) return;
+
+      const candidateId = 'portal-' + Math.random().toString(36).substring(7);
+      const text = `${session.user.email.split('@')[0]}\nEmail: ${session.user.email}\n\nResume Details:\n${candidateAppliedText}`;
+      const tempCand = {
+        id: candidateId, name: session.user.email.split('@')[0], text,
+        noticePeriod: null, currentCtc: null, expectedCtc: null, location: null,
+        preferredLocation: null, resumeQuality: null, scorecard: null, activityLog: null
+      };
+      const evalData = analyzeCandidateOffline(tempCand, selectedJobForApplication.title, selectedJobForApplication.description, selectedJobForApplication.mustHaves);
+      const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const mockRatings = {
+        recruiter: evalData.scorecard,
+        technical: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "Awaiting technical interview review." },
+        hr: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "Awaiting HR round." }
+      };
+      const newCandidate = {
+        id: candidateId, name: session.user.email.split('@')[0],
+        fileName: `${selectedJobForApplication.title.replace(/\s+/g, '_')}_Resume.txt`,
+        fileSize: candidateAppliedText.length, status: 'completed', ocrProgress: 0, text,
+        numChars: candidateAppliedText.length, errorDetails: '', score: evalData.calculatedScore,
+        evaluation: evalData, stage: 'screening', noticePeriod: evalData.notice_period,
+        currentCtc: evalData.current_ctc, expectedCtc: evalData.expected_ctc,
+        location: evalData.location, preferredLocation: evalData.preferred_location,
+        resumeQuality: evalData.resume_quality, scorecard: evalData.scorecard,
+        activityLog: [
+          { id: 1, type: "applied", text: `Candidate applied via Portal for job: ${selectedJobForApplication.title}`, timestamp: timeStr },
+          { id: 2, type: "screened", text: `ATS Match Screen complete. ATS Score: ${evalData.calculatedScore}%`, timestamp: timeStr }
+        ],
+        jobsData: {
+          [selectedJobForApplication.id]: {
+            score: evalData.calculatedScore, evaluation: evalData, stage: 'screening',
+            scorecard: evalData.scorecard, collaboratorRatings: mockRatings,
+            activityLog: [
+              { id: 1, type: "applied", text: `Candidate applied via Portal for job: ${selectedJobForApplication.title}`, timestamp: timeStr },
+              { id: 2, type: "screened", text: `ATS Match Screen complete. ATS Score: ${evalData.calculatedScore}%`, timestamp: timeStr }
+            ]
+          }
+        }
+      };
+      setCandidates(prev => [...prev, newCandidate]);
+      setCandidateAppliedText('');
+      setSelectedJobForApplication(null);
+      setActiveCandidateNavTab('applications');
+      alert(`🎉 Application submitted for ${selectedJobForApplication.title}! ATS Score: ${evalData.calculatedScore}%`);
+    };
+
+    const userName = session.user.email.split('@')[0];
+    const displayName = userName.charAt(0).toUpperCase() + userName.slice(1);
+    const candidateApplications = candidates.filter(c => extractEmail(c).toLowerCase() === session.user.email.toLowerCase());
+
+
+    // Dummy data for sections
+    const dummyAssessments = [
+      { id: 1, title: 'JavaScript Proficiency Test', company: 'TechCorp Solutions', duration: '45 min', questions: 30, dueDate: '2026-06-25', status: 'pending', difficulty: 'Intermediate' },
+      { id: 2, title: 'System Design Assessment', company: 'Innovate Labs', duration: '90 min', questions: 5, dueDate: '2026-06-28', status: 'pending', difficulty: 'Advanced' },
+      { id: 3, title: 'React & TypeScript Quiz', company: 'StartupXYZ', duration: '30 min', questions: 20, dueDate: '2026-06-20', status: 'completed', score: 87, difficulty: 'Intermediate' },
+    ];
+    const dummyMessages = [
+      { id: 1, from: 'Sarah Johnson', role: 'HR Manager @ TechCorp', avatar: 'SJ', time: '10:30 AM', preview: 'Congrats! You have been shortlisted for the next round...', unread: true, color: '#6366f1' },
+      { id: 2, from: 'Michael Chen', role: 'Tech Lead @ Innovate Labs', avatar: 'MC', time: 'Yesterday', preview: 'We reviewed your application and would like to schedule...', unread: true, color: '#8b5cf6' },
+      { id: 3, from: 'Priya Sharma', role: 'Recruiter @ StartupXYZ', avatar: 'PS', time: '2 days ago', preview: 'Thank you for applying. Our team has been impressed by...', unread: false, color: '#ec4899' },
+      { id: 4, from: 'RecruiterPro Team', role: 'Platform Notification', avatar: 'RP', time: '3 days ago', preview: 'Your profile has been viewed 12 times this week!', unread: false, color: '#f59e0b' },
+    ];
+    const dummyDocuments = [
+      { id: 1, name: 'Resume_2026_Final.pdf', type: 'Resume', size: '245 KB', date: '2026-06-15', icon: '📄' },
+      { id: 2, name: 'Cover_Letter_TechCorp.docx', type: 'Cover Letter', size: '82 KB', date: '2026-06-14', icon: '📝' },
+      { id: 3, name: 'Portfolio_Samples.zip', type: 'Portfolio', size: '4.2 MB', date: '2026-06-10', icon: '🗂' },
+      { id: 4, name: 'Certifications_AWS.pdf', type: 'Certificate', size: '560 KB', date: '2026-05-28', icon: '🏆' },
+    ];
+    const dummyInterviews = candidateApplications.flatMap(c => {
+      const jIds = Object.keys(c.jobsData || {});
+      return jIds.map(jId => {
+        const jd = c.jobsData[jId];
+        if (!jd?.interview) return null;
+        const job = jobs.find(j => j.id === jId) || { title: 'Position' };
+        return { ...jd.interview, jobTitle: job.title, candName: c.name };
+      }).filter(Boolean);
+    });
+    const dummyOffers = candidateApplications.flatMap(c => {
+      const jIds = Object.keys(c.jobsData || {});
+      return jIds.map(jId => {
+        const jd = c.jobsData[jId];
+        if (jd?.stage !== 'offer_extended' && jd?.stage !== 'hired') return null;
+        const job = jobs.find(j => j.id === jId) || { title: 'Position' };
+        return { ...jd, jobTitle: job.title, candidateId: c.id, jId };
+      }).filter(Boolean);
+    });
+    const dummyNotifications = [
+      { id: 1, icon: '🎯', title: 'Application Viewed', body: 'TechCorp Solutions viewed your profile for Senior React Developer', time: '2 hours ago', unread: true },
+      { id: 2, icon: '📅', title: 'Interview Reminder', body: 'Your interview with Innovate Labs is scheduled for tomorrow at 11:00 AM', time: '5 hours ago', unread: true },
+      { id: 3, icon: '⭐', title: 'New Recommendation', body: '3 new jobs match your profile — Senior Frontend Engineer at Google, Meta, and Netflix', time: '1 day ago', unread: false },
+      { id: 4, icon: '✅', title: 'Assessment Completed', body: 'Your React & TypeScript quiz results: 87/100. Great job!', time: '2 days ago', unread: false },
+      { id: 5, icon: '💼', title: 'Application Status Update', body: 'StartupXYZ moved your application to the Interview stage', time: '3 days ago', unread: false },
+    ];
+    const recommendedJobs = [
+      { id: 'rec-1', title: 'Senior React Developer', company: 'Google', location: 'Bangalore / Remote', salary: '40–55 LPA', match: 94, tags: ['React', 'TypeScript', 'GraphQL'] },
+      { id: 'rec-2', title: 'Frontend Architect', company: 'Meta', location: 'Hyderabad', salary: '35–50 LPA', match: 89, tags: ['React', 'Redux', 'Performance'] },
+      { id: 'rec-3', title: 'Full Stack Engineer', company: 'Flipkart', location: 'Bangalore', salary: '28–38 LPA', match: 82, tags: ['React', 'Node.js', 'AWS'] },
+      { id: 'rec-4', title: 'UI/UX Lead Engineer', company: 'Razorpay', location: 'Remote', salary: '25–35 LPA', match: 78, tags: ['React', 'Design Systems', 'CSS'] },
+    ];
+
+    const interviewPrepTopics = [
+      { id: 1, topic: 'React Deep Dive', questions: 25, difficulty: 'Advanced', progress: 60 },
+      { id: 2, topic: 'System Design Fundamentals', questions: 15, difficulty: 'Advanced', progress: 30 },
+      { id: 3, topic: 'JavaScript & TypeScript', questions: 40, difficulty: 'Intermediate', progress: 85 },
+      { id: 4, topic: 'Behavioral & HR Questions', questions: 20, difficulty: 'Easy', progress: 40 },
+    ];
+
+    const navItems = [
+      { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+      { id: 'profile', label: 'My Profile', icon: <User size={18} /> },
+      { id: 'resume', label: 'Resume Center', icon: <FileText size={18} /> },
+      { id: 'jobs', label: 'Job Search', icon: <Search size={18} /> },
+      { id: 'saved', label: 'Saved Jobs', icon: <Bookmark size={18} />, badge: savedJobIds.length || 0 },
+      { id: 'recommended', label: 'Recommended Jobs', icon: <Star size={18} />, badge: recommendedJobs.length },
+      { id: 'applications', label: 'Applications', icon: <ClipboardList size={18} />, badge: candidateApplications.length },
+      { id: 'assessments', label: 'Assessments', icon: <Award size={18} />, badge: dummyAssessments.filter(a => a.status === 'pending').length },
+      { id: 'interviews', label: 'Interviews', icon: <Calendar size={18} />, badge: dummyInterviews.length },
+      { id: 'offers', label: 'Offers', icon: <Briefcase size={18} />, badge: dummyOffers.length },
+      { id: 'documents', label: 'Documents', icon: <Folder size={18} /> },
+      { id: 'messages', label: 'Messages', icon: <MessageSquare size={18} />, badge: dummyMessages.filter(m => m.unread).length },
+      { id: 'notifications', label: 'Notifications', icon: <Bell size={18} />, badge: dummyNotifications.filter(n => n.unread).length },
+      { id: 'ai-assistant', label: 'AI Career Assistant', icon: <Bot size={18} /> },
+      { id: 'ai-interview', label: 'AI Interview Prep', icon: <Target size={18} /> },
+      { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
+    ];
+
+    const renderPortalContent = () => {
+      switch (activeCandidateNavTab) {
+        case 'dashboard': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+            {/* Welcome Banner */}
+            <div className="cp-welcome-banner">
+              <div>
+                <h1 className="cp-welcome-title">Welcome back, {displayName}! 👋</h1>
+                <p className="cp-welcome-sub">Your career journey at a glance. {candidateApplications.length > 0 ? `You have ${candidateApplications.length} active application(s).` : 'Start applying to jobs today!'}</p>
               </div>
-            )}
-          </div>
+              <div className="cp-welcome-avatar">{displayName.charAt(0).toUpperCase()}</div>
+            </div>
 
-          {/* Candidates File status list */}
-          {candidates.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-muted">Files Queue ({candidates.length})</span>
-                <button 
-                  type="button" 
-                  style={{ background: 'none', border: 'none', color: 'var(--color-red)', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                  onClick={() => setCandidates([])}
-                >
-                  <Trash2 size={12} /> Clear all
-                </button>
-              </div>
+            {/* Stats Row */}
+            <div className="cp-stats-grid">
+              {[
+                { label: 'Applications', value: candidateApplications.length, icon: <ClipboardList size={18} />, color: '#6366f1' },
+                { label: 'Profile Views', value: 47, icon: <Eye size={18} />, color: '#8b5cf6' },
+                { label: 'Saved Jobs', value: savedJobIds.length, icon: <Bookmark size={18} />, color: '#ec4899' },
+                { label: 'Interviews', value: dummyInterviews.length, icon: <Calendar size={18} />, color: '#f59e0b' },
+              ].map(stat => (
+                <div key={stat.label} className="cp-stat-card">
+                  <div className="cp-stat-icon" style={{ background: stat.color + '20', color: stat.color }}>{stat.icon}</div>
+                  <div className="cp-stat-value" style={{ color: stat.color }}>{stat.value}</div>
+                  <div className="cp-stat-label">{stat.label}</div>
+                </div>
+              ))}
+            </div>
 
-              <div className="file-list scroll-container">
-                {enrichedCandidates.map((candidate) => (
-                  <div key={candidate.id} className="flex-col gap-2" style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '0.6rem 0.75rem', backgroundColor: 'var(--color-white)' }}>
-                    <div className="flex justify-between items-center w-full">
-                      <div className="file-info">
-                        <FileText size={16} style={{ color: 'var(--color-ink-light)', flexShrink: 0 }} />
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span className="file-name" style={{ fontSize: '0.8rem' }}>{candidate.name}</span>
-                          <span className="file-size">{formatBytes(candidate.fileSize)}</span>
+            {/* Two Column: Applications + Recommended */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              {/* Recent Applications */}
+              <div className="cp-section-card">
+                <div className="cp-section-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <ClipboardList size={15} style={{ color: 'var(--color-terracotta)' }} /> Recent Applications
+                  </span>
+                  <button className="cp-link-btn" onClick={() => setActiveCandidateNavTab('applications')}>View All <ChevronRight size={14} /></button>
+                </div>
+                {candidateApplications.length === 0 ? (
+                  <div className="cp-empty-state">
+                    <div style={{ fontSize: '2.5rem' }}>📭</div>
+                    <p>No applications yet. Browse jobs and apply!</p>
+                    <button className="cp-action-btn" onClick={() => setActiveCandidateNavTab('jobs')}>Browse Jobs</button>
+                  </div>
+                ) : (
+                  candidateApplications.slice(0, 3).map(cand => {
+                    const jIds = Object.keys(cand.jobsData || {});
+                    const jId = jIds[0] || 'job-1';
+                    const jd = cand.jobsData?.[jId] || {};
+                    const stage = jd.stage || cand.stage || 'screening';
+                    const job = jobs.find(j => j.id === jId) || jobs[0];
+                    const stageColors = { screening: '#6366f1', shortlisted: '#10b981', interviewing: '#f59e0b', offer_extended: '#f97316', hired: '#22c55e', rejected: '#ef4444' };
+                    return (
+                      <div key={cand.id} className="cp-app-row">
+                        <div className="cp-app-row-left">
+                          <div className="cp-app-company-logo">{job?.title?.charAt(0)}</div>
+                          <div>
+                            <div className="cp-app-title">{job?.title}</div>
+                            <div className="cp-app-date">Applied {cand.created_at ? new Date(cand.created_at).toLocaleDateString() : 'Recently'}</div>
+                          </div>
                         </div>
+                        <span className="cp-stage-badge" style={{ background: (stageColors[stage] || '#6366f1') + '20', color: stageColors[stage] || '#6366f1' }}>{stage.replace('_', ' ')}</span>
                       </div>
-                      
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        {candidate.status === 'reading' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-gold)' }}>
-                            <span className="dot reading"></span> reading...
-                          </span>
-                        )}
-                        {candidate.status === 'ocr_progress' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-terracotta)' }}>
-                            <span className="dot ocr"></span> OCR {candidate.ocrProgress}%
-                          </span>
-                        )}
-                        {candidate.status === 'ready' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-sage)' }}>
-                            <span className="dot ready"></span> {candidate.numChars} chars
-                          </span>
-                        )}
-                        {candidate.status === 'screening' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-terracotta)', animation: 'pulse 1s infinite' }}>
-                            screening...
-                          </span>
-                        )}
-                        {candidate.status === 'completed' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-sage)' }}>
-                            Score: {candidate.score}
-                          </span>
-                        )}
-                        {candidate.status === 'failed' && (
-                          <span className="status-indicator" style={{ color: 'var(--color-red)' }}>
-                            <span className="dot error"></span> failed
-                          </span>
-                        )}
+                    );
+                  })
+                )}
+              </div>
 
-                        <button 
-                          type="button" 
-                          style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer' }}
-                          onClick={() => removeCandidate(candidate.id)}
-                        >
-                          <Trash2 size={13} />
-                        </button>
+              {/* Recommended Jobs */}
+              <div className="cp-section-card">
+                <div className="cp-section-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Star size={15} style={{ color: 'var(--color-gold)' }} /> Recommended for You
+                  </span>
+                  <button className="cp-link-btn" onClick={() => setActiveCandidateNavTab('recommended')}>View All <ChevronRight size={14} /></button>
+                </div>
+                {recommendedJobs.slice(0, 3).map(j => (
+                  <div key={j.id} className="cp-app-row">
+                    <div className="cp-app-row-left">
+                      <div className="cp-app-company-logo" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>{j.company.charAt(0)}</div>
+                      <div>
+                        <div className="cp-app-title">{j.title}</div>
+                        <div className="cp-app-date">{j.company} · {j.location}</div>
                       </div>
                     </div>
-
-                    {candidate.status === 'failed' && (
-                      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.4rem' }}>
-                        <span className="text-xs text-red" style={{ color: 'var(--color-red)' }}>
-                          Error: {candidate.errorDetails}
-                        </span>
-                        <div className="flex gap-2">
-                          <button 
-                            type="button" 
-                            className="btn-secondary" 
-                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }}
-                            onClick={() => handleOcrRetry(candidate.id)}
-                          >
-                            <RefreshCw size={10} /> Run OCR Retry
-                          </button>
-                        </div>
-                        <div style={{ marginTop: '0.2rem' }}>
-                          <textarea 
-                            className="input-textarea text-xs" 
-                            style={{ minHeight: '60px', padding: '0.4rem' }}
-                            placeholder="Or paste resume text manually here to fix..."
-                            onChange={(e) => handleManualTextPasteFix(candidate.id, e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
+                    <span className="cp-match-badge">{j.match}%</span>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </div>
 
-        {/* WORKFLOW 3: Shortlist slider & Trigger button */}
-        <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-            3. Shortlist Settings
-          </span>
+            {/* Upcoming Interviews */}
+            {dummyInterviews.length > 0 && (
+              <div className="cp-section-card">
+                <div className="cp-section-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Calendar size={15} style={{ color: 'var(--color-gold)' }} /> Upcoming Interviews
+                  </span>
+                </div>
+                {dummyInterviews.map((iv, idx) => (
+                  <div key={idx} className="cp-interview-row">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f59e0b20', color: '#f59e0b', width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0 }}>
+                      <Calendar size={20} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700' }}>{iv.jobTitle}</div>
+                      <div className="cp-app-date">Interviewer: {iv.interviewer} · {new Date(iv.dateTime).toLocaleString()}</div>
+                      <div className="cp-app-date" style={{ fontStyle: 'italic' }}>Agenda: {iv.agenda}</div>
+                    </div>
+                    <span className="cp-stage-badge" style={{ background: '#f59e0b20', color: '#f59e0b' }}>Scheduled</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
 
-          <div className="slider-container">
-            <div className="slider-labels">
-              <span>Threshold Bar</span>
-              <span className="slider-val">{threshold} / 100</span>
+        case 'profile': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={20} style={{ color: '#6366f1' }} /> My Profile</h2><p>Complete your profile to increase visibility to recruiters.</p></div>
+            {/* Profile Completion */}
+            <div className="cp-section-card">
+              <div className="cp-section-header"><span>Profile Completion</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                <div className="cp-profile-avatar">{displayName.charAt(0)}</div>
+                <div>
+                  <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>{displayName}</div>
+                  <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.82rem' }}>{session.user.email}</div>
+                  <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertCircle size={14} /> Profile 40% complete — Add details to attract recruiters</div>
+                </div>
+              </div>
+              <div className="cp-progress-bar-track"><div className="cp-progress-bar-fill" style={{ width: '40%' }} /></div>
             </div>
-            <input 
-              type="range" 
-              min="50" 
-              max="95" 
-              value={threshold} 
-              onChange={(e) => setThreshold(parseInt(e.target.value))}
-            />
-            <span className="text-xs text-muted">
-              Profiles scoring equal or higher than {threshold} are designated as shortlisted matches.
-            </span>
+            <div className="cp-section-card">
+              <div className="cp-section-header"><span>Basic Information</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                {[
+                  { label: 'Full Name', key: 'fullName', placeholder: `${displayName} Sharma` },
+                  { label: 'Phone Number', key: 'phone', placeholder: '+91 98765 43210' },
+                  { label: 'Location', key: 'location', placeholder: 'Bangalore, India' },
+                  { label: 'Professional Headline', key: 'headline', placeholder: 'Senior React Developer | 5+ Years' },
+                ].map(field => (
+                  <div key={field.key} className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">{field.label}</label>
+                    <input type="text" className="input-text" placeholder={field.placeholder}
+                      value={candidateProfileData[field.key]}
+                      onChange={e => setCandidateProfileData(p => ({ ...p, [field.key]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
+                <label className="form-label text-xs">Professional Bio</label>
+                <textarea className="input-textarea" style={{ minHeight: '100px' }} placeholder="Write a brief professional summary..."
+                  value={candidateProfileData.bio}
+                  onChange={e => setCandidateProfileData(p => ({ ...p, bio: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
+                <label className="form-label text-xs">Key Skills (comma separated)</label>
+                <input type="text" className="input-text" placeholder="React, TypeScript, Node.js, AWS, Redux"
+                  value={candidateProfileData.skills}
+                  onChange={e => setCandidateProfileData(p => ({ ...p, skills: e.target.value }))} />
+              </div>
+              <button className="cp-action-btn" style={{ marginTop: '1rem', width: 'auto', padding: '0.6rem 2rem' }}
+                onClick={async () => {
+                  await saveCandidateMetadata(candidateProfileData, null, null);
+                  alert('Profile saved successfully!');
+                }}>Save Profile</button>
+            </div>
+          </div>
+        );
+
+        case 'resume': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={20} style={{ color: '#6366f1' }} /> Resume Center</h2><p>Manage your resumes and cover letters.</p></div>
+            <div className="cp-section-card">
+              <div className="cp-section-header"><span>Upload New Resume</span></div>
+              <div className="cp-upload-zone" onClick={() => setPasteFallbackOpen(true)}>
+                <Upload size={36} style={{ color: '#6366f1', marginBottom: '0.75rem' }} />
+                <div style={{ fontWeight: '700', marginBottom: '0.25rem' }}>Drag & Drop or Click to Upload</div>
+                <div className="cp-app-date">PDF, DOCX, TXT up to 5MB</div>
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <div className="cp-section-header"><span>Your Documents</span></div>
+                {dummyDocuments.map(doc => (
+                  <div key={doc.id} className="cp-doc-row">
+                    <span style={{ fontSize: '1.5rem' }}>{doc.icon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.88rem' }}>{doc.name}</div>
+                      <div className="cp-app-date">{doc.type} · {doc.size} · {doc.date}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="cp-action-btn-sm" onClick={() => alert('Downloading...')}>Download</button>
+                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }} onClick={() => alert('Deleted!')}>Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+        case 'jobs': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Search size={20} style={{ color: '#6366f1' }} /> Job Search</h2><p>Explore all available job openings.</p></div>
+            <div className="cp-section-card">
+              <input type="text" className="input-text" style={{ marginBottom: '1rem' }} placeholder="Search by title, skill, or company..." />
+              {jobs.map(job => {
+                const alreadyApplied = candidateApplications.some(c => c.jobsData && c.jobsData[job.id]);
+                const isSaved = savedJobIds.includes(job.id);
+                return (
+                  <div key={job.id} className="cp-job-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
+                          <div className="cp-app-company-logo">{job.title.charAt(0)}</div>
+                          <div>
+                            <div style={{ fontWeight: '800', fontSize: '0.95rem' }}>{job.title}</div>
+                            <div className="cp-app-date">RecruiterPro Corp · Bangalore, India · Full-time</div>
+                          </div>
+                        </div>
+                        <p style={{ fontSize: '0.82rem', color: 'var(--color-ink-light)', margin: '0.5rem 0', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {job.description.split('\n')[0]}
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                          {(job.mustHaves || '').split(',').slice(0, 4).map(tag => (
+                            <span key={tag} style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderRadius: '4px', fontWeight: '600' }}>{tag.trim()}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', marginLeft: '1rem' }}>
+                        {alreadyApplied ? (
+                          <span className="cp-stage-badge" style={{ background: '#10b98120', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}><Check size={14} /> Applied</span>
+                        ) : (
+                          <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }}
+                            onClick={() => { setSelectedJobForApplication(job); setActiveCandidateNavTab('apply'); }}>Apply Now</button>
+                        )}
+                        <button className="cp-action-btn-sm" style={{ background: isSaved ? '#f59e0b20' : undefined, color: isSaved ? '#f59e0b' : undefined, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          onClick={async () => {
+                            const nextSaved = isSaved ? savedJobIds.filter(id => id !== job.id) : [...savedJobIds, job.id];
+                            setSavedJobIds(nextSaved);
+                            await saveCandidateMetadata(null, nextSaved, null);
+                          }}>
+                          <Bookmark size={13} /> {isSaved ? 'Saved' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+        case 'apply': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header">
+              <button className="cp-link-btn" style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => { setSelectedJobForApplication(null); setActiveCandidateNavTab('jobs'); }}><ChevronLeft size={14} /> Back to Jobs</button>
+              <h2>Apply for: {selectedJobForApplication?.title}</h2>
+            </div>
+            <div className="cp-section-card">
+              <div className="apply-card" style={{ margin: 0, border: 'none', padding: 0, boxShadow: 'none' }}>
+                <div style={{ background: 'var(--color-paper-light)', border: '1px solid var(--color-border)', padding: '1rem', borderRadius: '6px' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Job Description</h4>
+                  <pre style={{ margin: 0, fontSize: '0.82rem', color: 'var(--color-ink-light)', fontFamily: 'inherit', whiteSpace: 'pre-wrap' }}>{selectedJobForApplication?.description}</pre>
+                </div>
+                <form onSubmit={handleApplySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Email Address (Pre-filled)</label>
+                    <input type="text" className="input-text" value={session.user.email} disabled />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Paste Resume Content</label>
+                    <textarea className="input-textarea" style={{ minHeight: '220px', fontFamily: 'var(--font-mono)', fontSize: '0.82rem' }}
+                      placeholder="Paste full text contents of your resume (experience, education, and skills)..."
+                      value={candidateAppliedText} onChange={e => setCandidateAppliedText(e.target.value)} required />
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button type="submit" className="cp-action-btn" style={{ width: 'auto', padding: '0.6rem 2rem' }}>Submit Application</button>
+                    <button type="button" className="btn-secondary" style={{ padding: '0.6rem 1.5rem' }} onClick={() => { setSelectedJobForApplication(null); setActiveCandidateNavTab('jobs'); }}>Cancel</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+
+        case 'saved': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Bookmark size={20} style={{ color: '#6366f1' }} /> Saved Jobs</h2><p>{savedJobIds.length} saved job(s) ready to apply.</p></div>
+            {savedJobIds.length === 0 ? (
+              <div className="cp-section-card">
+                <div className="cp-empty-state">
+                  <Bookmark size={48} style={{ color: 'var(--color-ink-muted)', opacity: 0.4 }} />
+                  <p>No saved jobs yet. Browse jobs and save the ones you like!</p>
+                  <button className="cp-action-btn" onClick={() => setActiveCandidateNavTab('jobs')}>Browse Jobs</button>
+                </div>
+              </div>
+            ) : (
+              jobs.filter(j => savedJobIds.includes(j.id)).map(job => (
+                <div key={job.id} className="cp-section-card">
+                  <div className="cp-section-header">
+                    <span style={{ fontWeight: '800' }}>{job.title}</span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }}
+                        onClick={() => { setSelectedJobForApplication(job); setActiveCandidateNavTab('apply'); }}>Apply Now</button>
+                      <button className="cp-action-btn-sm" style={{ background: '#ef444410', color: '#ef4444' }}
+                        onClick={async () => {
+                          const nextSaved = savedJobIds.filter(id => id !== job.id);
+                          setSavedJobIds(nextSaved);
+                          await saveCandidateMetadata(null, nextSaved, null);
+                        }}>Remove</button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--color-ink-light)', margin: 0 }}>{job.description.split('\n')[0]}</p>
+                </div>
+              ))
+            )}
+          </div>
+        );
+
+        case 'recommended': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Star size={20} style={{ color: '#6366f1' }} /> Recommended Jobs</h2><p>Jobs curated by AI based on your profile and skills.</p></div>
+            {recommendedJobs.map(j => (
+              <div key={j.id} className="cp-section-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'start' }}>
+                    <div className="cp-app-company-logo" style={{ width: '48px', height: '48px', fontSize: '1.4rem', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', flexShrink: 0 }}>{j.company.charAt(0)}</div>
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '1rem' }}>{j.title}</div>
+                      <div className="cp-app-date">{j.company} · {j.location}</div>
+                      <div style={{ color: '#10b981', fontWeight: '700', fontSize: '0.82rem', marginTop: '0.2rem' }}>{j.salary}</div>
+                      <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                        {j.tags.map(t => <span key={t} style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', background: 'rgba(99,102,241,0.1)', color: '#6366f1', borderRadius: '4px', fontWeight: '600' }}>{t}</span>)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                    <div className="cp-match-badge" style={{ fontSize: '1rem', padding: '0.4rem 0.75rem' }}>{j.match}% Match</div>
+                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert('Applying...')}>Quick Apply</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+        case 'applications': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><ClipboardList size={20} style={{ color: '#6366f1' }} /> My Applications</h2><p>{candidateApplications.length} active application(s).</p></div>
+            {candidateApplications.length === 0 ? (
+              <div className="cp-section-card"><div className="cp-empty-state">
+                <FolderOpen size={48} style={{ color: 'var(--color-ink-muted)', opacity: 0.4 }} />
+                <p>No applications yet. Start applying to open positions!</p>
+                <button className="cp-action-btn" onClick={() => setActiveCandidateNavTab('jobs')}>Browse Jobs</button>
+              </div></div>
+            ) : candidateApplications.map(cand => {
+              const jIds = Object.keys(cand.jobsData || {});
+              const jId = jIds[0] || 'job-1';
+              const jd = cand.jobsData?.[jId] || {};
+              const stage = jd.stage || cand.stage || 'screening';
+              const job = jobs.find(j => j.id === jId) || jobs[0];
+              const stageColors = { screening: '#6366f1', shortlisted: '#10b981', interviewing: '#f59e0b', offer_extended: '#f97316', hired: '#22c55e', rejected: '#ef4444' };
+              const stages = ['screening', 'shortlisted', 'interviewing', 'offer_extended', 'hired'];
+              const stageIdx = stages.indexOf(stage);
+              const isOffer = stage === 'offer_extended';
+              const isHired = stage === 'hired';
+              return (
+                <div key={cand.id} className="cp-section-card" style={{ borderLeft: `4px solid ${stageColors[stage] || '#6366f1'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '1.05rem' }}>{job?.title}</div>
+                      <div className="cp-app-date">Applied {cand.created_at ? new Date(cand.created_at).toLocaleDateString() : 'Recently'} · ATS Score: <strong style={{ color: '#6366f1' }}>{cand.score || jd.score || 0}%</strong></div>
+                    </div>
+                    <span className="cp-stage-badge" style={{ background: (stageColors[stage] || '#6366f1') + '20', color: stageColors[stage] || '#6366f1', fontSize: '0.78rem', padding: '0.3rem 0.75rem' }}>
+                      {isHired ? 'Hired' : isOffer ? 'Offer Extended' : stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
+                  </div>
+                  {/* Progress Bar */}
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', gap: '0' }}>
+                      {stages.map((s, i) => (
+                        <div key={s} style={{ flex: 1, height: '4px', background: i <= stageIdx ? (stageColors[stage] || '#6366f1') : 'var(--color-border)', borderRadius: i === 0 ? '4px 0 0 4px' : i === stages.length - 1 ? '0 4px 4px 0' : '0', transition: 'background 0.3s' }} />
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem' }}>
+                      {stages.map((s, i) => <span key={s} style={{ fontSize: '0.62rem', color: i <= stageIdx ? 'var(--color-ink-light)' : 'var(--color-ink-muted)', fontWeight: i === stageIdx ? '700' : '400' }}>{s.replace('_', ' ')}</span>)}
+                    </div>
+                  </div>
+                  {jd.interview && (
+                    <div style={{ marginTop: '0.75rem', background: '#f59e0b10', border: '1px solid #f59e0b40', borderRadius: '6px', padding: '0.75rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Calendar size={14} style={{ color: '#f59e0b' }} /> <strong>Interview:</strong> {new Date(jd.interview.dateTime).toLocaleString()} with {jd.interview.interviewer}
+                    </div>
+                  )}
+                  {isOffer && jd.offerDetails && (
+                    <div style={{ marginTop: '0.75rem', background: '#f9731610', border: '1px solid #f9731640', borderRadius: '6px', padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: '700', color: '#f97316', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><Sparkles size={16} /> Job Offer: {jd.offerDetails.salaryLpa} LPA — Join {jd.offerDetails.joiningDate}</span>
+                      <button className="cp-action-btn" style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', background: '#f97316', width: 'auto' }}
+                        onClick={() => { setActiveOfferCandidateId(cand.id); setOfferSalaryLpa(jd.offerDetails.salaryLpa); setOfferJoiningDate(jd.offerDetails.joiningDate); setOfferNotes(jd.offerDetails.notes || ''); }}>
+                        Review & Sign Offer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+
+        case 'assessments': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Award size={20} style={{ color: '#6366f1' }} /> Assessments</h2><p>Complete skill assessments to boost your profile.</p></div>
+            {dummyAssessments.map(a => (
+              <div key={a.id} className="cp-section-card" style={{ borderLeft: `4px solid ${a.status === 'completed' ? '#10b981' : '#6366f1'}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{a.title}</div>
+                    <div className="cp-app-date">{a.company} · {a.duration} · {a.questions} questions · {a.difficulty}</div>
+                    {a.status === 'pending' && <div style={{ fontSize: '0.75rem', color: '#ef4444', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertTriangle size={12} /> Due: {a.dueDate}</div>}
+                    {a.status === 'completed' && <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle size={12} /> Score: {a.score}/100</div>}
+                  </div>
+                  {a.status === 'pending' ? (
+                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert('Assessment started!')}>Start Now</button>
+                  ) : (
+                    <span className="cp-stage-badge" style={{ background: '#10b98120', color: '#10b981' }}>Completed</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+        case 'interviews': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Calendar size={20} style={{ color: '#6366f1' }} /> Interviews</h2><p>Track all your scheduled and past interviews.</p></div>
+            {dummyInterviews.length === 0 ? (
+              <div className="cp-section-card"><div className="cp-empty-state">
+                <Calendar size={48} style={{ color: 'var(--color-ink-muted)', opacity: 0.4 }} />
+                <p>No interviews scheduled yet. Keep applying and you'll get one soon!</p>
+              </div></div>
+            ) : dummyInterviews.map((iv, idx) => (
+              <div key={idx} className="cp-section-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{iv.jobTitle}</div>
+                    <div className="cp-app-date">Interviewer: {iv.interviewer}</div>
+                    <div className="cp-app-date" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Calendar size={13} /> {new Date(iv.dateTime).toLocaleString()}</div>
+                    <div className="cp-app-date" style={{ fontStyle: 'italic' }}>Agenda: {iv.agenda}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                    <span className="cp-stage-badge" style={{ background: '#f59e0b20', color: '#f59e0b' }}>Upcoming</span>
+                    <button className="cp-action-btn" style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => setActiveCandidateNavTab('ai-interview')}>Prep with AI <Sparkles size={13} /></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+        case 'offers': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Briefcase size={20} style={{ color: '#6366f1' }} /> Offers</h2><p>Review and sign your job offer letters.</p></div>
+            {dummyOffers.length === 0 ? (
+              <div className="cp-section-card"><div className="cp-empty-state">
+                <Briefcase size={48} style={{ color: 'var(--color-ink-muted)', opacity: 0.4 }} />
+                <p>No offers yet. Keep going — you're almost there!</p>
+              </div></div>
+            ) : dummyOffers.map((offer, idx) => {
+              const cand = candidateApplications.find(c => c.id === offer.candidateId);
+              return (
+                <div key={idx} className="cp-section-card" style={{ borderLeft: '4px solid #f97316' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div>
+                      <div style={{ fontWeight: '800', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Sparkles size={16} style={{ color: '#f97316' }} /> Job Offer: {offer.jobTitle}</div>
+                      <div className="cp-app-date">Package: <strong style={{ color: '#10b981' }}>{offer.offerDetails?.salaryLpa} LPA</strong></div>
+                      <div className="cp-app-date">Joining: {offer.offerDetails?.joiningDate}</div>
+                      {offer.stage === 'hired' && <div style={{ color: '#22c55e', fontWeight: '700', marginTop: '0.25rem' }}>ACCEPTED — You are officially Hired!</div>}
+                    </div>
+                    {offer.stage === 'offer_extended' && cand && (
+                      <button className="cp-action-btn" style={{ background: '#f97316', width: 'auto' }}
+                        onClick={() => { setActiveOfferCandidateId(cand.id); setOfferSalaryLpa(offer.offerDetails?.salaryLpa); setOfferJoiningDate(offer.offerDetails?.joiningDate); setOfferNotes(offer.offerDetails?.notes || ''); }}>
+                        Review & Sign Offer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+
+        case 'documents': {
+          const renderDocIcon = (type) => {
+            switch (type) {
+              case 'Resume': return <FileText size={20} style={{ color: '#6366f1' }} />;
+              case 'Cover Letter': return <FileCheck size={20} style={{ color: '#10b981' }} />;
+              case 'Portfolio': return <Folder size={20} style={{ color: '#f59e0b' }} />;
+              case 'Certificate': return <Award size={20} style={{ color: '#8b5cf6' }} />;
+              default: return <FileText size={20} style={{ color: '#64748b' }} />;
+            }
+          };
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Folder size={20} style={{ color: '#6366f1' }} /> Documents</h2><p>Manage your resumes, certificates, and cover letters.</p></div>
+              <div className="cp-section-card">
+                {dummyDocuments.map(doc => (
+                  <div key={doc.id} className="cp-doc-row">
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: 'var(--color-paper-darker)', borderRadius: '8px' }}>
+                      {renderDocIcon(doc.type)}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700' }}>{doc.name}</div>
+                      <div className="cp-app-date">{doc.type} · {doc.size} · Uploaded {doc.date}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="cp-action-btn-sm" onClick={() => alert('Downloading...')}>Download</button>
+                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => alert('Deleted!')}><Trash2 size={13} /> Delete</button>
+                    </div>
+                  </div>
+                ))}
+                <button className="cp-action-btn" style={{ width: 'auto', marginTop: '0.5rem' }} onClick={() => setActiveCandidateNavTab('resume')}>+ Upload New Document</button>
+              </div>
+            </div>
+          );
+        }
+
+        case 'messages': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MessageSquare size={20} style={{ color: '#6366f1' }} /> Messages</h2><p>{dummyMessages.filter(m => m.unread).length} unread message(s).</p></div>
+            <div className="cp-section-card" style={{ padding: 0, overflow: 'hidden' }}>
+              {dummyMessages.map((msg, idx) => (
+                <div key={msg.id} className="cp-message-row" style={{ borderBottom: idx < dummyMessages.length - 1 ? '1px solid var(--color-border)' : 'none', background: msg.unread ? 'var(--color-paper-light)' : 'transparent' }}>
+                  <div className="cp-msg-avatar" style={{ background: msg.color }}>{msg.avatar}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: msg.unread ? '800' : '600', fontSize: '0.9rem' }}>{msg.from}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--color-ink-muted)' }}>{msg.time}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '0.1rem' }}>{msg.role}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-ink-light)', marginTop: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '350px' }}>{msg.preview}</div>
+                  </div>
+                  {msg.unread && <div style={{ width: '8px', height: '8px', background: '#6366f1', borderRadius: '50%', flexShrink: 0 }} />}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+        case 'notifications': {
+          const renderNotificationIcon = (icon) => {
+            switch (icon) {
+              case '🎯': return <Target size={18} style={{ color: '#6366f1' }} />;
+              case '📅': return <Calendar size={18} style={{ color: '#f59e0b' }} />;
+              case '⭐': return <Star size={18} style={{ color: '#ec4899' }} />;
+              case '✅': return <CheckCircle size={18} style={{ color: '#10b981' }} />;
+              case '💼': return <Briefcase size={18} style={{ color: '#8b5cf6' }} />;
+              default: return <Bell size={18} style={{ color: '#64748b' }} />;
+            }
+          };
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Bell size={20} style={{ color: '#6366f1' }} /> Notifications</h2><p>{dummyNotifications.filter(n => n.unread).length} new notification(s).</p></div>
+              <div className="cp-section-card" style={{ padding: 0, overflow: 'hidden' }}>
+                {dummyNotifications.map((n, idx) => (
+                  <div key={n.id} className="cp-message-row" style={{ borderBottom: idx < dummyNotifications.length - 1 ? '1px solid var(--color-border)' : 'none', background: n.unread ? 'var(--color-paper-light)' : 'transparent' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: 'var(--color-paper-darker)', borderRadius: '8px', flexShrink: 0 }}>
+                      {renderNotificationIcon(n.icon)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontWeight: n.unread ? '800' : '600', fontSize: '0.9rem' }}>{n.title}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--color-ink-muted)' }}>{n.time}</span>
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--color-ink-light)', marginTop: '0.2rem' }}>{n.body}</div>
+                    </div>
+                    {n.unread && <div style={{ width: '8px', height: '8px', background: '#6366f1', borderRadius: '50%', flexShrink: 0 }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        case 'ai-assistant': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', height: '100%' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Bot size={20} style={{ color: '#6366f1' }} /> AI Career Assistant</h2><p>Ask me anything about your career, resume, or job search!</p></div>
+            <div className="cp-section-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0' }}>
+              <div className="cp-chat-messages">
+                {candidateAIMessages.map((msg, idx) => (
+                  <div key={idx} className={`cp-chat-bubble ${msg.sender === 'ai' ? 'cp-chat-ai' : 'cp-chat-user'}`}>
+                    {msg.sender === 'ai' && <Bot size={18} style={{ color: '#6366f1', flexShrink: 0, marginTop: '0.2rem' }} />}
+                    <div className="cp-chat-text">{msg.text}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ borderTop: '1px solid var(--color-border)', padding: '1rem', display: 'flex', gap: '0.75rem' }}>
+                <input type="text" className="input-text" style={{ flex: 1, margin: 0 }}
+                  placeholder="Ask about resume tips, salary negotiation, interview prep..."
+                  value={candidateAIInput} onChange={e => setCandidateAIInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && candidateAIInput.trim()) {
+                      const userMsg = candidateAIInput.trim();
+                      const nextMsgs1 = [...candidateAIMessages, { sender: 'user', text: userMsg }];
+                      setCandidateAIMessages(nextMsgs1);
+                      setCandidateAIInput('');
+                      saveCandidateMetadata(null, null, nextMsgs1);
+                      setTimeout(async () => {
+                        const responses = [
+                          "Great question! Based on your React and TypeScript skills, I'd recommend highlighting your component architecture experience and any performance optimization work you've done.",
+                          "For salary negotiation, always research market rates first. With your profile, you could realistically ask for 25-35 LPA in Bangalore for a Senior Frontend role.",
+                          "Your resume looks solid! I'd suggest adding quantified achievements — e.g., 'Reduced page load time by 40%' rather than just 'Improved performance'.",
+                          "For the technical interview, practice LeetCode medium problems (arrays, hashmaps, trees) and be ready to discuss system design concepts like caching and load balancing.",
+                        ];
+                        const reply = responses[Math.floor(Math.random() * responses.length)];
+                        const nextMsgs2 = [...nextMsgs1, { sender: 'ai', text: reply }];
+                        setCandidateAIMessages(nextMsgs2);
+                        await saveCandidateMetadata(null, null, nextMsgs2);
+                      }, 800);
+                    }
+                  }} />
+                <button className="cp-action-btn" style={{ width: 'auto', padding: '0.6rem 1.25rem' }}
+                  onClick={async () => {
+                    if (!candidateAIInput.trim()) return;
+                    const userMsg = candidateAIInput.trim();
+                    const nextMsgs1 = [...candidateAIMessages, { sender: 'user', text: userMsg }];
+                    setCandidateAIMessages(nextMsgs1);
+                    setCandidateAIInput('');
+                    await saveCandidateMetadata(null, null, nextMsgs1);
+                    setTimeout(async () => {
+                      const nextMsgs2 = [...nextMsgs1, { sender: 'ai', text: "I'd recommend tailoring your resume to match the job description keywords. Would you like me to analyze a specific job description for you?" }];
+                      setCandidateAIMessages(nextMsgs2);
+                      await saveCandidateMetadata(null, null, nextMsgs2);
+                    }, 800);
+                  }}>Send</button>
+              </div>
+            </div>
+          </div>
+        );
+
+        case 'ai-interview': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Target size={20} style={{ color: '#6366f1' }} /> AI Interview Preparation</h2><p>Practice interview questions tailored to your applied roles.</p></div>
+            <div className="cp-stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              {[{ label: 'Topics', value: interviewPrepTopics.length, icon: <BookOpen size={18} />, color: '#6366f1' }, { label: 'Questions Practiced', value: 47, icon: <ClipboardList size={18} />, color: '#8b5cf6' }, { label: 'Average Score', value: '76%', icon: <Award size={18} />, color: '#10b981' }].map(s => (
+                <div key={s.label} className="cp-stat-card">
+                  <div className="cp-stat-icon" style={{ background: s.color + '20', color: s.color }}>{s.icon}</div>
+                  <div className="cp-stat-value" style={{ color: s.color }}>{s.value}</div>
+                  <div className="cp-stat-label">{s.label}</div>
+                </div>
+              ))}
+            </div>
+            {interviewPrepTopics.map(topic => (
+              <div key={topic.id} className="cp-section-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '1rem' }}>{topic.topic}</div>
+                    <div className="cp-app-date">{topic.questions} questions · <span style={{ color: topic.difficulty === 'Advanced' ? '#ef4444' : topic.difficulty === 'Intermediate' ? '#f59e0b' : '#10b981' }}>{topic.difficulty}</span></div>
+                  </div>
+                  <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert(`Starting ${topic.topic} practice!`)}>Practice Now</button>
+                </div>
+                <div className="cp-progress-bar-track">
+                  <div className="cp-progress-bar-fill" style={{ width: `${topic.progress}%`, background: topic.progress > 70 ? '#10b981' : topic.progress > 40 ? '#f59e0b' : '#6366f1' }} />
+                </div>
+                <div style={{ fontSize: '0.72rem', color: 'var(--color-ink-muted)', marginTop: '0.35rem' }}>{topic.progress}% complete</div>
+              </div>
+            ))}
+          </div>
+        );
+
+        case 'settings': return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Settings size={20} style={{ color: '#6366f1' }} /> Settings</h2><p>Manage your account and notification preferences.</p></div>
+            <div className="cp-section-card">
+              <div className="cp-section-header"><span>Account</span></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.88rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div><div style={{ fontWeight: '700' }}>Email Address</div><div className="cp-app-date">{session.user.email}</div></div>
+                  <button className="cp-action-btn-sm" onClick={() => alert('Email cannot be changed here. Contact support.')}>Change</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div><div style={{ fontWeight: '700' }}>Password</div><div className="cp-app-date">Last changed: Never</div></div>
+                  <button className="cp-action-btn-sm" onClick={() => alert('Password reset link sent to your email.')}>Reset</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div><div style={{ fontWeight: '700' }}>Profile Visibility</div><div className="cp-app-date">Public — Visible to all recruiters</div></div>
+                  <button className="cp-action-btn-sm" onClick={() => alert('Visibility updated to Private!')}>Toggle</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0' }}>
+                  <div><div style={{ fontWeight: '700', color: '#ef4444' }}>Delete Account</div><div className="cp-app-date">Permanently delete your account and all data</div></div>
+                  <button className="cp-action-btn-sm" style={{ background: '#ef444420', color: '#ef4444' }} onClick={() => alert('Please contact support to delete your account.')}>Delete</button>
+                </div>
+              </div>
+            </div>
+            <div className="cp-section-card">
+              <div className="cp-section-header"><span>Notifications</span></div>
+              {[
+                { label: 'Email Notifications', sub: 'Receive updates via email', defaultOn: true },
+                { label: 'Application Status Updates', sub: 'When your stage changes', defaultOn: true },
+                { label: 'Interview Reminders', sub: '24 hours before your interview', defaultOn: true },
+                { label: 'Job Recommendations', sub: 'Weekly curated job matches', defaultOn: false },
+              ].map(setting => (
+                <div key={setting.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div><div style={{ fontWeight: '700', fontSize: '0.88rem' }}>{setting.label}</div><div className="cp-app-date">{setting.sub}</div></div>
+                  <div className="cp-toggle" style={{ background: setting.defaultOn ? '#6366f1' : 'var(--color-border)' }} onClick={() => {}} />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+        default: return null;
+      }
+    };
+
+    return (
+      <div className="cp-container">
+        {/* Sidebar */}
+        <aside className="cp-sidebar">
+          <div className="cp-sidebar-brand">
+            <Target size={20} />
+            <span>RecruiterPro</span>
+          </div>
+          <nav className="cp-sidebar-nav">
+            {navItems.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                className={`cp-nav-item ${activeCandidateNavTab === item.id || (activeCandidateNavTab === 'apply' && item.id === 'jobs') ? 'cp-nav-active' : ''}`}
+                onClick={() => {
+                  if (item.id === 'jobs' && selectedJobForApplication) setSelectedJobForApplication(null);
+                  setActiveCandidateNavTab(item.id);
+                }}
+              >
+                <span className="cp-nav-icon">{item.icon}</span>
+                <span className="cp-nav-label">{item.label}</span>
+                {item.badge > 0 && <span className="cp-nav-badge">{item.badge}</span>}
+              </button>
+            ))}
+            <div className="cp-sidebar-divider" />
+            <button type="button" className="cp-nav-item cp-nav-logout" onClick={handleLogout}>
+              <LogOut size={16} />
+              <span className="cp-nav-label">Logout</span>
+            </button>
+          </nav>
+          <div className="cp-sidebar-user">
+            <div className="cp-sidebar-avatar">{displayName.charAt(0)}</div>
+            <div className="cp-sidebar-user-info">
+              <div className="cp-sidebar-name">{displayName}</div>
+              <div className="cp-sidebar-email">{session.user.email}</div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="cp-main">
+          <div className="cp-main-inner scroll-container">
+            {selectedJobForApplication && activeCandidateNavTab !== 'apply'
+              ? null
+              : renderPortalContent()
+            }
+            {!selectedJobForApplication && activeCandidateNavTab === 'apply' && (
+              <div className="cp-page-header"><p>Select a job to apply from Job Search.</p></div>
+            )}
+          </div>
+        </main>
+
+        {/* Offer Review Modal */}
+        {activeOfferCandidateId && (() => {
+          const cand = candidates.find(c => c.id === activeOfferCandidateId);
+          if (!cand) return null;
+          const activeJobIds = Object.keys(cand.jobsData || {});
+          const jId = activeJobIds[0] || 'job-1';
+          const activeJob = jobs.find(j => j.id === jId) || jobs[0];
+          return (
+            <div className="modal-backdrop">
+              <div className="modal-content" style={{ width: '760px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '90vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="modal-title" style={{ color: 'var(--color-gold)' }}>Review Job Offer</h3>
+                  <button type="button" className="btn-close" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => setActiveOfferCandidateId(null)}><X size={20} /></button>
+                </div>
+                <div className="offer-letter-card">
+                  <div className="offer-letter-header">
+                    <span className="offer-letter-brand">RecruiterPro Corp</span>
+                    <span className="offer-letter-date">DATE: {new Date().toLocaleDateString()}</span>
+                  </div>
+                  <div>
+                    <p>Dear <strong>{cand.name}</strong>,</p>
+                    <p>We are delighted to extend a formal offer for the position of <strong>{activeJob.title}</strong>. Your ATS match score of <strong>{cand.score}%</strong> stood out remarkably.</p>
+                    <p>Your package and start details:</p>
+                    <div className="offer-salary-highlight">Annual CTC: {offerSalaryLpa} LPA</div>
+                    <p>Target joining date: <strong>{offerJoiningDate}</strong></p>
+                    {offerNotes && <div style={{ marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}><strong>Perks & Conditions:</strong><p style={{ margin: '0.25rem 0', fontStyle: 'italic' }}>{offerNotes}</p></div>}
+                    <p style={{ marginTop: '1rem' }}>To accept, check the box and type your legal name below.</p>
+                    <div className="signature-block">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input type="checkbox" id="offer-check" checked={isOfferSigned} onChange={e => setIsOfferSigned(e.target.checked)} style={{ width: '16px', height: '16px' }} />
+                        <label htmlFor="offer-check" style={{ fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}>I accept all employment terms and conditions.</label>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginTop: '0.5rem' }}>
+                        <span className="signature-input-label">Digital Signature (Type Legal Name)</span>
+                        <input type="text" className="signature-input-field" placeholder="e.g. Jane Miller" value={candidateSignature} onChange={e => setCandidateSignature(e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setActiveOfferCandidateId(null)}>Close</button>
+                  <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0.6rem 2rem', backgroundColor: 'var(--color-sage)', border: 'none', color: '#FFF', cursor: 'pointer' }}
+                    disabled={!isOfferSigned || !candidateSignature.trim()}
+                    onClick={() => {
+                      const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                      const updatedLog = [...(cand.activityLog || [])];
+                      updatedLog.push({ id: updatedLog.length + 1, type: 'hired', text: `🎉 Offer accepted and signed: "${candidateSignature}"`, timestamp: timeStr });
+                      updateCandidateJobData(cand.id, { stage: 'hired', offerSignature: { signature: candidateSignature, signedAt: timeStr }, activityLog: updatedLog });
+                      setIsOfferSigned(false); setCandidateSignature(''); setActiveOfferCandidateId(null);
+                      alert('🎉 Congratulations! You have accepted the offer. Welcome aboard!');
+                    }}>
+                    Accept & Sign Offer
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+  const renderCandidateAuthModal = () => {
+    if (!isCandidateAuthOpen) return null;
+    return (
+      <div className="modal-backdrop" style={{ zIndex: 10001 }}>
+        <div className="modal-content candidate-auth-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="modal-title" style={{ fontSize: '1.2rem', color: 'var(--color-terracotta)', fontWeight: '850' }}>
+              {candidateAuthMode === 'login' ? 'Candidate Sign In' : 'Candidate Account Sign Up'}
+            </h3>
+            <button 
+              type="button" 
+              className="btn-close" 
+              style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+              onClick={() => {
+                setIsCandidateAuthOpen(false);
+                setCandidateAuthError(null);
+              }}
+            >
+              <X size={18} />
+            </button>
           </div>
 
-          <button 
-            type="button" 
-            className="btn-primary" 
-            style={{ width: '100%', py: '1rem' }}
-            onClick={handleScreenAndRank}
-            disabled={isScreening || enrichedCandidates.filter(c => c.status === 'ready').length === 0}
-          >
-            {isScreening ? (
+          {candidateAuthError && (
+            <div className="auth-error-banner" style={{ marginBottom: 0 }}>
+              <AlertCircle size={14} style={{ flexShrink: 0 }} />
+              <span>{candidateAuthError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleCandidateAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label text-xs">Email Address</label>
+              <input
+                type="email"
+                className="input-text"
+                placeholder="you@example.com"
+                value={candidateEmail}
+                onChange={(e) => setCandidateEmail(e.target.value)}
+                disabled={candidateAuthLoading}
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label text-xs">Password</label>
+              <input
+                type="password"
+                className="input-text"
+                placeholder="••••••••"
+                value={candidatePassword}
+                onChange={(e) => setCandidatePassword(e.target.value)}
+                disabled={candidateAuthLoading}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ width: '100%', padding: '0.65rem', backgroundColor: 'var(--color-terracotta)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer' }}
+              disabled={candidateAuthLoading}
+            >
+              {candidateAuthLoading ? (
+                <>
+                  <RefreshCw className="spinner" size={14} style={{ animation: 'spin 1.5s linear infinite' }} />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>{candidateAuthMode === 'login' ? 'Sign In' : 'Sign Up & Create Account'}</span>
+              )}
+            </button>
+          </form>
+
+          <div style={{ fontSize: '0.8rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
+            {candidateAuthMode === 'login' ? (
               <>
-                <RefreshCw className="spinner" size={18} style={{ animation: 'spin 1.5s linear infinite' }} />
-                <span>Screening {currentScreenIndex + 1} of {candidates.length}...</span>
+                New to RecruiterPro?{' '}
+                <button
+                  type="button"
+                  className="auth-mode-switch-btn"
+                  onClick={() => {
+                    setCandidateAuthMode('register');
+                    setCandidateAuthError(null);
+                  }}
+                >
+                  Create an account
+                </button>
               </>
             ) : (
               <>
-                <Sparkles size={18} />
-                <span>Screen & Rank {enrichedCandidates.filter(c => c.status === 'ready').length || ''} Candidates</span>
+                Already have a profile?{' '}
+                <button
+                  type="button"
+                  className="auth-mode-switch-btn"
+                  onClick={() => {
+                    setCandidateAuthMode('login');
+                    setCandidateAuthError(null);
+                  }}
+                >
+                  Sign in here
+                </button>
               </>
             )}
-          </button>
+          </div>
         </div>
+      </div>
+    );
+  };
 
-        {/* WORKFLOW 4: Recruitment Filters */}
-        {enrichedCandidates.some(c => c.status === 'completed') && (
-          <div className="card animate-fade-in" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <span style={{ fontWeight: '800', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.5rem' }}>
-              4. Recruitment Filters
-            </span>
+  const renderLoginScreen = () => {
+    const isCandidate = loginRole === 'candidate';
+    const isRegister = loginMode === 'register' && isCandidate;
 
-            <div className="slider-container" style={{ marginBottom: 0 }}>
-              <div className="slider-labels">
-                <span>Max Expected Salary</span>
-                <span className="slider-val" style={{ color: 'var(--color-terracotta)' }}>{maxExpectedCtc} LPA</span>
-              </div>
-              <input 
-                type="range" 
-                min="5" 
-                max="60" 
-                value={maxExpectedCtc} 
-                onChange={(e) => setMaxExpectedCtc(parseInt(e.target.value))}
-                style={{ cursor: 'pointer' }}
-              />
-              <span className="text-xs text-muted">
-                Hide candidates asking more than {maxExpectedCtc} LPA.
-              </span>
+    return (
+      <div className="auth-container">
+        {/* Background Glowing Blobs */}
+        <div className="auth-bg-blob blob-1"></div>
+        <div className="auth-bg-blob blob-2"></div>
+        <div className="auth-bg-blob blob-3"></div>
+
+        <div className="auth-card" style={{ maxWidth: '440px' }}>
+          <div className="auth-header">
+            <div className="auth-logo-circle">
+              <Sparkles size={26} />
             </div>
+            <h2 className="auth-title">RecruiterPro</h2>
+            <p className="auth-subtitle">AI-Powered Hiring Platform</p>
+          </div>
 
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Notice Period</label>
-              <select 
-                className="input-text text-sm" 
-                style={{ padding: '0.4rem 0.75rem', height: 'auto', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-ink)' }}
-                value={noticePeriodFilter}
-                onChange={(e) => setNoticePeriodFilter(e.target.value)}
-              >
-                <option value="any">Any Notice Period</option>
-                <option value="immediate">Immediate Joiners Only</option>
-                <option value="30">Max 30 Days Notice</option>
-              </select>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Target Location</label>
-              <input 
-                type="text" 
-                className="input-text text-sm" 
-                placeholder="e.g. Bangalore, Mumbai"
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-              />
-            </div>
-            
-            {(maxExpectedCtc < 40 || noticePeriodFilter !== 'any' || locationFilter !== '') && (
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                style={{ fontSize: '0.75rem', justifyContent: 'center', width: '100%' }}
+          {/* Role Selector Tabs */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label className="auth-label" style={{ marginBottom: '0.6rem', display: 'block', textAlign: 'center' }}>Portal Login</label>
+            <div className="auth-role-tabs">
+              <button
+                type="button"
+                className={`auth-role-tab ${isCandidate ? 'active' : ''}`}
                 onClick={() => {
-                  setMaxExpectedCtc(40);
-                  setNoticePeriodFilter('any');
-                  setLocationFilter('');
+                  setLoginRole('candidate');
+                  setLoginMode('login');
+                  setLoginError(null);
+                  setLoginEmail('');
+                  setLoginPassword('');
                 }}
+                disabled={isSigningIn}
               >
-                Reset Filters
+                <Users size={16} />
+                <span>Job Candidate</span>
               </button>
-            )}
-          </div>
-        )}
-      </aside>
-
-      {/* 2. RESULTS PANEL (RIGHT COLUMN) */}
-      <main className="main-panel">
-        <header className="app-header">
-          <div className="app-branding">
-            <span className="app-logo">🎯</span>
-            <div>
-              <h1 className="app-title">RecruitPro ATS</h1>
-              <p className="text-sm text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span>Objective Decision Support System</span>
-                <span>•</span>
-                <span>Offline Scorer Engine</span>
-                <span>•</span>
-                <span 
-                  onClick={() => setIsSupabaseModalOpen(true)}
-                  style={{ 
-                    cursor: 'pointer', 
-                    display: 'inline-flex', 
-                    alignItems: 'center', 
-                    gap: '0.3rem', 
-                    padding: '0.15rem 0.5rem', 
-                    borderRadius: '10px', 
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    background: supabaseStatus === 'connected' ? 'rgba(46, 117, 89, 0.15)' : supabaseStatus === 'schema_missing' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                    color: supabaseStatus === 'connected' ? 'var(--color-sage)' : supabaseStatus === 'schema_missing' ? '#e28509' : 'var(--color-red)',
-                    border: `1px solid ${supabaseStatus === 'connected' ? 'rgba(46, 117, 89, 0.3)' : supabaseStatus === 'schema_missing' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                    transition: 'all 0.3s ease'
-                  }}
-                  title="Click to manage Supabase database integration"
-                >
-                  <span className={`dot ${supabaseStatus === 'connected' ? 'active' : ''}`} style={{ 
-                    width: '6px', 
-                    height: '6px', 
-                    borderRadius: '50%', 
-                    background: supabaseStatus === 'connected' ? 'var(--color-sage)' : supabaseStatus === 'schema_missing' ? 'orange' : 'var(--color-red)',
-                    display: 'inline-block'
-                  }}></span>
-                  Supabase: {supabaseStatus === 'connected' ? 'Connected' : supabaseStatus === 'schema_missing' ? 'Tables Missing' : supabaseStatus === 'connecting' ? 'Connecting...' : 'Error / Disconnected'}
-                </span>
-              </p>
+              <button
+                type="button"
+                className={`auth-role-tab ${!isCandidate ? 'active' : ''}`}
+                onClick={() => {
+                  setLoginRole('admin');
+                  setLoginMode('login');
+                  setLoginError(null);
+                  setLoginEmail('');
+                  setLoginPassword('');
+                }}
+                disabled={isSigningIn}
+              >
+                <Briefcase size={16} />
+                <span>HR Recruiter</span>
+              </button>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {/* Theme Toggle Button */}
+          {/* Login / Register Tabs (Candidate only) */}
+          {isCandidate && (
+            <div className="auth-mode-tabs">
+              <button
+                type="button"
+                className={`auth-mode-tab ${loginMode === 'login' ? 'active' : ''}`}
+                onClick={() => { setLoginMode('login'); setLoginError(null); }}
+                disabled={isSigningIn}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-mode-tab ${loginMode === 'register' ? 'active' : ''}`}
+                onClick={() => { setLoginMode('register'); setLoginError(null); }}
+                disabled={isSigningIn}
+              >
+                Create Account
+              </button>
+            </div>
+          )}
+
+          {loginError && (
+            <div className="auth-error-banner">
+              <AlertCircle size={16} style={{ flexShrink: 0 }} />
+              <span>{loginError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="auth-form">
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="email-input">Email Address</label>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon"><Mail size={16} /></span>
+                <input
+                  id="email-input"
+                  type="email"
+                  className="auth-input"
+                  placeholder={isCandidate ? 'you@example.com' : 'admink338@gmail.com'}
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  disabled={isSigningIn}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="password-input">
+                Password{isRegister && <span style={{ fontWeight: 400, color: 'var(--color-ink-muted)', fontSize: '0.72rem' }}> (min 6 characters)</span>}
+              </label>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon"><Lock size={16} /></span>
+                <input
+                  id="password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  className="auth-input"
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  disabled={isSigningIn}
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-input-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
             <button
-              type="button"
-              className="btn-secondary"
-              style={{
-                borderRadius: '50%',
-                width: '38px',
-                height: '38px',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid var(--color-border)',
-                cursor: 'pointer',
-                background: 'var(--color-white)',
-                color: 'var(--color-ink)',
-                boxShadow: 'var(--shadow-sm)',
-                transition: 'var(--transition-smooth)'
-              }}
-              onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
-              title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              type="submit"
+              className="auth-btn-submit"
+              disabled={isSigningIn}
             >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              {isSigningIn ? (
+                <>
+                  <RefreshCw className="spinner" size={16} style={{ animation: 'spin 1.5s linear infinite' }} />
+                  <span>{isRegister ? 'Creating Account...' : 'Signing In...'}</span>
+                </>
+              ) : (
+                <span>{isRegister ? '🚀 Create Candidate Account' : isCandidate ? '🔑 Sign In to Candidate Portal' : '🏢 Admin Sign In'}</span>
+              )}
             </button>
+          </form>
 
-            {/* View Mode Switcher */}
-            {enrichedCandidates.some(c => c.status === 'completed') && (
-              <div className="view-toggle-bar" style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--color-paper-darker)', padding: '0.25rem', borderRadius: 'var(--radius-sm)' }}>
-                <button 
-                  type="button" 
-                  className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', border: 'none', background: viewMode === 'grid' ? 'var(--color-white)' : 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: viewMode === 'grid' ? 'bold' : 'normal', color: 'var(--color-ink)', boxShadow: viewMode === 'grid' ? 'var(--shadow-sm)' : 'none' }}
-                  onClick={() => setViewMode('grid')}
-                >
-                  Grid View
-                </button>
-                <button 
-                  type="button" 
-                  className={`view-toggle-btn ${viewMode === 'kanban' ? 'active' : ''}`}
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', border: 'none', background: viewMode === 'kanban' ? 'var(--color-white)' : 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: viewMode === 'kanban' ? 'bold' : 'normal', color: 'var(--color-ink)', boxShadow: viewMode === 'kanban' ? 'var(--shadow-sm)' : 'none' }}
-                  onClick={() => setViewMode('kanban')}
-                >
-                  Kanban Pipeline
-                </button>
-                <button 
-                  type="button" 
-                  className={`view-toggle-btn ${viewMode === 'analytics' ? 'active' : ''}`}
-                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', border: 'none', background: viewMode === 'analytics' ? 'var(--color-white)' : 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: viewMode === 'analytics' ? 'bold' : 'normal', color: 'var(--color-ink)', boxShadow: viewMode === 'analytics' ? 'var(--shadow-sm)' : 'none' }}
-                  onClick={() => setViewMode('analytics')}
-                >
-                  Hiring Analytics
-                </button>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* KPI Dashboard Stats Ribbon */}
-        {enrichedCandidates.some(c => c.status === 'completed') && (
-          <div className="kpi-grid animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '-1rem' }}>
-            <div className="card kpi-card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="kpi-icon-container" style={{ background: 'var(--color-terracotta-light)', color: 'var(--color-terracotta)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                📊
-              </div>
-              <div>
-                <span className="text-xs text-muted" style={{ textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Average Score</span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'var(--font-mono)', margin: 0 }}>{kpis.avgScore}%</h3>
-              </div>
+          {!isCandidate && (
+            <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--color-ink-muted)', textAlign: 'center' }}>
+              <strong style={{ color: 'var(--color-ink-light)' }}>Authorized Access Only</strong><br />Please sign in using your recruiter coordinates.
             </div>
-            
-            <div className="card kpi-card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="kpi-icon-container" style={{ background: 'var(--color-sage-light)', color: 'var(--color-sage)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                👥
-              </div>
-              <div>
-                <span className="text-xs text-muted" style={{ textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Screened</span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'var(--font-mono)', margin: 0 }}>{kpis.count} Candidates</h3>
-              </div>
-            </div>
+          )}
 
-            <div className="card kpi-card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="kpi-icon-container" style={{ background: 'var(--color-gold-light)', color: 'var(--color-gold)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                ⚡
-              </div>
-              <div>
-                <span className="text-xs text-muted" style={{ textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Immediate Joiners</span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'var(--font-mono)', margin: 0 }}>{kpis.immediateCount} Profiles</h3>
-              </div>
-            </div>
-
-            <div className="card kpi-card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div className="kpi-icon-container" style={{ background: 'rgba(78, 194, 116, 0.12)', color: 'var(--color-sage)', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
-                💰
-              </div>
-              <div>
-                <span className="text-xs text-muted" style={{ textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Under Budget (≤25L)</span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: '800', fontFamily: 'var(--font-mono)', margin: 0 }}>{kpis.underBudgetCount} Matches</h3>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Search and Filters toolbar */}
-        {enrichedCandidates.some(c => c.status === 'completed' || c.status === 'failed') && (
-          <div className="toolbar-bar animate-fade-in" style={{ display: 'flex', gap: '1rem', alignItems: 'center', backgroundColor: 'var(--color-white)', padding: '1rem 1.25rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', marginTop: '-1rem', marginBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', flex: 1, minWidth: '280px', position: 'relative' }}>
-              <input 
-                type="text" 
-                className="input-text text-sm" 
-                placeholder="Search candidates by name, email, skills..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{ padding: '0.55rem 1rem', paddingRight: '2.5rem' }}
-              />
-              {searchQuery && (
-                <button 
-                  type="button" 
-                  onClick={() => setSearchQuery('')}
-                  style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <X size={14} />
-                </button>
+          {isCandidate && (
+            <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
+              {loginMode === 'login' ? (
+                <>Don't have an account?{' '}
+                  <button type="button" onClick={() => setLoginMode('register')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Create one free →</button>
+                </>
+              ) : (
+                <>Already registered?{' '}
+                  <button type="button" onClick={() => setLoginMode('login')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Sign in instead →</button>
+                </>
               )}
             </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderLeftSidebar = () => {
+    return (
+      <aside className="recruiterpro-sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-logo"><Target size={22} /></div>
+          <div className="brand-name">RecruiterPro</div>
+        </div>
+        
+        <nav className="sidebar-nav">
+          {[
+            { id: 'jobs', label: 'Jobs Dashboard', icon: <Briefcase size={18} /> },
+            { id: 'candidates', label: 'Candidates Manager', icon: <Users size={18} /> },
+            { id: 'careers', label: 'Careers Portal', icon: <Globe size={18} /> },
+            { id: 'templates', label: 'Email Center', icon: <Mail size={18} /> },
+            { id: 'settings', label: 'System Settings', icon: <Settings size={18} /> }
+          ].map(item => {
+            const isActive = activeSidebarTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveSidebarTab(item.id)}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+                {item.id === 'candidates' && candidates.length > 0 && (
+                  <span className="nav-badge">{candidates.length}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-avatar" title={session?.user?.email || 'Admin Recruiter'}>
+            {(session?.user?.email || 'AD').substring(0, 2).toUpperCase()}
+          </div>
+          <div className="user-info" style={{ overflow: 'hidden' }}>
+            <div className="user-name" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {session?.user?.email ? session.user.email.split('@')[0] : 'Admin Recruiter'}
+            </div>
+            <div className="user-role" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={session?.user?.email || 'admink338@gmail.com'}>
+              {session?.user?.email || 'admink338@gmail.com'}
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="sidebar-logout-btn" 
+            onClick={handleLogout} 
+            title="Log Out"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+      </aside>
+    );
+  };
+
+  const renderTopHeader = () => {
+    let title = "Candidates Manager";
+    if (activeSidebarTab === 'jobs') title = "Jobs Dashboard";
+    else if (activeSidebarTab === 'careers') title = "Careers Page Builder";
+    else if (activeSidebarTab === 'templates') title = "Email Templates & Logs";
+    else if (activeSidebarTab === 'settings') title = "System Settings & Integrations";
+
+    return (
+      <header className="recruiterpro-header">
+        <div className="header-breadcrumbs">
+          <span className="breadcrumb-root">Dashboard</span>
+          <span className="breadcrumb-separator">/</span>
+          <span className="breadcrumb-current">{title}</span>
+          {activeJobId && (
+            <>
+              <span className="breadcrumb-separator">/</span>
+              <span className="breadcrumb-job-title">{jobTitle}</span>
+            </>
+          )}
+        </div>
+
+        <div className="header-actions">
+          {/* Supabase status pill */}
+          <div 
+            className={`supabase-status-pill ${supabaseStatus}`}
+            onClick={() => setIsSupabaseModalOpen(true)}
+            title="Click to manage Supabase database integration"
+          >
+            <span className="status-dot"></span>
+            <span className="status-text">
+              Supabase: {supabaseStatus === 'connected' ? 'Connected' : supabaseStatus === 'schema_missing' ? 'Tables Missing' : supabaseStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+            </span>
+          </div>
+
+          {/* AI Assistant Chatbot toggle */}
+          <button
+            type="button"
+            className={`theme-toggle-button ${isChatbotOpen ? 'active' : ''}`}
+            onClick={() => setIsChatbotOpen(!isChatbotOpen)}
+            title="Open AI Recruiting Assistant"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem', color: isChatbotOpen ? 'var(--color-terracotta)' : 'inherit', cursor: 'pointer' }}
+          >
+            <Sparkles size={16} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 'bold' }}>AI Ask</span>
+          </button>
+
+          {/* Theme toggle */}
+          <button
+            type="button"
+            className="theme-toggle-button"
+            onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+        </div>
+      </header>
+    );
+  };
+
+  const renderJobsView = () => {
+    return (
+      <div className="jobs-view-panel animate-fade-in">
+        <div className="view-header">
+          <h2>Job Openings Specification</h2>
+          <p className="subtitle">Select or create job openings, configure description details and must-have requirement lists.</p>
+        </div>
+
+        <div className="jobs-layout-grid">
+          {/* Left panel: job list selector */}
+          <div className="job-list-card card">
+            <h3 className="card-title">Select Active Job</h3>
+            <div className="job-select-wrapper">
+              <select
+                className="input-text select-job"
+                value={activeJobId}
+                onChange={(e) => handleSelectJob(e.target.value)}
+              >
+                {jobs.map(job => (
+                  <option key={job.id} value={job.id}>{job.title}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-primary btn-add-job"
+                onClick={() => setIsJobModalOpen(true)}
+              >
+                + Create Job
+              </button>
+            </div>
             
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '240px' }}>
-              <span className="text-xs font-bold uppercase tracking-wider text-muted">Min Score:</span>
-              <input 
-                type="range" 
-                min="50" 
-                max="95" 
-                value={minScoreFilter} 
-                onChange={(e) => setMinScoreFilter(parseInt(e.target.value))}
-                style={{ flex: 1, height: '4px', cursor: 'pointer' }}
-              />
-              <span className="mono-font text-sm font-bold" style={{ color: 'var(--color-terracotta)', minWidth: '24px' }}>
-                {minScoreFilter}+
-              </span>
-              {minScoreFilter > 50 && (
+            <div className="quick-templates-section">
+              <h4>AI Templates Generator</h4>
+              <p className="help-text">Load pre-configured specs for common roles:</p>
+              <div className="templates-button-grid">
                 <button 
                   type="button" 
                   className="btn-secondary" 
-                  style={{ padding: '0.15rem 0.4rem', fontSize: '0.7rem' }}
-                  onClick={() => setMinScoreFilter(50)}
+                  onClick={() => {
+                    setJobTitle(JD_TEMPLATES.react_developer.title);
+                    setJobDescription(JD_TEMPLATES.react_developer.description);
+                    setMustHaves(JD_TEMPLATES.react_developer.mustHaves);
+                  }}
                 >
-                  Reset
+                  React Frontend
                 </button>
-              )}
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setJobTitle(JD_TEMPLATES.python_data_scientist.title);
+                    setJobDescription(JD_TEMPLATES.python_data_scientist.description);
+                    setMustHaves(JD_TEMPLATES.python_data_scientist.mustHaves);
+                  }}
+                >
+                  Data Scientist
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setJobTitle(JD_TEMPLATES.product_manager.title);
+                    setJobDescription(JD_TEMPLATES.product_manager.description);
+                    setMustHaves(JD_TEMPLATES.product_manager.mustHaves);
+                  }}
+                >
+                  Product Manager
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={() => {
+                    setJobTitle(JD_TEMPLATES.qa_automation_engineer.title);
+                    setJobDescription(JD_TEMPLATES.qa_automation_engineer.description);
+                    setMustHaves(JD_TEMPLATES.qa_automation_engineer.mustHaves);
+                  }}
+                >
+                  QA Automation
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right panel: job specifications editor */}
+          <div className="job-editor-card card">
+            <div className="editor-header">
+              <h3 className="card-title">Job Specification Editor</h3>
+              <button 
+                type="button" 
+                className="btn-secondary btn-upload-jd" 
+                onClick={() => jdFileInputRef.current?.click()}
+              >
+                <Upload size={14} /> Upload JD Document
+              </button>
+              <input 
+                type="file" 
+                ref={jdFileInputRef} 
+                style={{ display: 'none' }} 
+                accept=".pdf,.docx,.txt"
+                onChange={handleJdFileUpload} 
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Opening Title</label>
+              <input 
+                type="text" 
+                className="input-text" 
+                placeholder="e.g. Senior Frontend Engineer (React)"
+                value={jobTitle}
+                onChange={(e) => handleUpdateJobField('title', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Full Job Description</label>
+              <textarea 
+                className="input-textarea jd-textarea" 
+                placeholder="Paste comprehensive job details, roles, responsibilities, and qualifications..."
+                value={jobDescription}
+                onChange={(e) => handleUpdateJobField('description', e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Must-Have Requirement Checklist (comma-separated)</label>
+              <textarea 
+                className="input-textarea must-haves-textarea" 
+                placeholder="e.g. React, TypeScript, 5+ years experience, Git"
+                value={mustHaves}
+                onChange={(e) => handleUpdateJobField('mustHaves', e.target.value)}
+              />
+              <span className="help-text">Requirements matching supports year-count extraction (e.g. 5+ years experience) and keyword validation.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCandidatesView = () => {
+    const activeFilterCount = [
+      searchQuery.trim() !== '',
+      minScoreFilter > 50,
+      maxExpectedCtc < 60,
+      noticePeriodFilter !== 'any',
+      locationFilter.trim() !== '',
+      stageFilter !== 'all',
+      verdictFilter !== 'all',
+      activeSkillFilters.length > 0,
+    ].filter(Boolean).length;
+
+    const readyCount = enrichedCandidates.filter(c => c.status === 'ready').length;
+    const hasCompleted = enrichedCandidates.some(c => c.status === 'completed');
+
+    return (
+      <div className="candidates-view-panel animate-fade-in">
+        {/* KPI stats ribbon */}
+        {hasCompleted && (
+          <div className="kpi-grid">
+            <div className="card kpi-card avg-score">
+              <div className="kpi-icon-container avg-score"><TrendingUp size={20} /></div>
+              <div>
+                <span className="kpi-label">Average Score</span>
+                <h3 className="kpi-value">{kpis.avgScore}%</h3>
+              </div>
+            </div>
+            <div className="card kpi-card screened">
+              <div className="kpi-icon-container screened"><Users size={20} /></div>
+              <div>
+                <span className="kpi-label">Screened</span>
+                <h3 className="kpi-value">{kpis.count} Candidates</h3>
+              </div>
+            </div>
+            <div className="card kpi-card immediate">
+              <div className="kpi-icon-container immediate"><Zap size={20} /></div>
+              <div>
+                <span className="kpi-label">Immediate</span>
+                <h3 className="kpi-value">{kpis.immediateCount} Profiles</h3>
+              </div>
+            </div>
+            <div className="card kpi-card budget">
+              <div className="kpi-icon-container budget"><DollarSign size={20} /></div>
+              <div>
+                <span className="kpi-label">Under Budget</span>
+                <h3 className="kpi-value">{kpis.underBudgetCount} Matches</h3>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Trending Skills Ribbon */}
-        {enrichedCandidates.some(c => c.status === 'completed') && (
-          <div className="card skill-cloud-container" style={{ padding: '0.85rem 1.25rem', marginTop: '-0.25rem', marginBottom: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="text-xs font-bold uppercase tracking-wider text-muted" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                🔥 Trending Skill Cloud Filter
-              </span>
-              {activeSkillFilters.length > 0 && (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ padding: '0.1rem 0.4rem', fontSize: '0.7rem' }}
-                  onClick={() => setActiveSkillFilters([])}
-                >
-                  Clear Filters
-                </button>
+        {/* Filter & Toolbar Area */}
+        <div className="toolbar-section">
+          {/* Row 1: Search + Quick filters + View switch */}
+          <div className="toolbar-main-row">
+            {/* Search input */}
+            <div className="search-bar-wrapper">
+              <span className="search-icon">🔍</span>
+              <input 
+                type="text" 
+                className="input-text search-input" 
+                placeholder="Search candidates by name, email, skills..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button type="button" className="clear-search-btn" onClick={() => setSearchQuery('')}>✕</button>
               )}
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+
+            {/* Verdict quick toggles */}
+            <div className="verdict-filter-pills">
+              {[
+                { val: 'all', label: 'All Candidates' },
+                { val: 'Shortlisted', label: 'Shortlisted' },
+                { val: 'Borderline', label: 'Borderline' },
+                { val: 'Not a fit', label: 'Not a Fit' }
+              ].map(item => (
+                <button
+                  key={item.val}
+                  type="button"
+                  className={`filter-pill-btn ${verdictFilter === item.val ? 'active' : ''} ${item.val.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={() => setVerdictFilter(item.val)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Sorting */}
+            <div className="sort-wrapper">
+              <span className="sort-label">Sort:</span>
+              <select
+                className="input-text sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="score_desc">Score: High → Low</option>
+                <option value="score_asc">Score: Low → High</option>
+                <option value="name_asc">Name: A → Z</option>
+                <option value="name_desc">Name: Z → A</option>
+                <option value="ctc_asc">Expected CTC: Low → High</option>
+                <option value="ctc_desc">Expected CTC: High → Low</option>
+                <option value="notice_asc">Notice Period: Shortest</option>
+              </select>
+            </div>
+
+            {/* View toggles */}
+            <div className="view-mode-selector">
+              <button 
+                type="button" 
+                className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => setViewMode('grid')}
+              >
+                Grid View
+              </button>
+              <button 
+                type="button" 
+                className={`view-toggle-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+                onClick={() => setViewMode('kanban')}
+              >
+                Kanban Board
+              </button>
+              <button 
+                type="button" 
+                className={`view-toggle-btn ${viewMode === 'analytics' ? 'active' : ''}`}
+                onClick={() => setViewMode('analytics')}
+              >
+                Hiring Analytics
+              </button>
+            </div>
+
+            {/* Advanced Filters Trigger */}
+            <button
+              type="button"
+              className={`btn-filters-toggle ${isFilterPanelOpen ? 'active' : ''}`}
+              onClick={() => setIsFilterPanelOpen(p => !p)}
+            >
+              ⚙ Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}
+            </button>
+          </div>
+
+          {/* Row 2: Advanced filters panel */}
+          {isFilterPanelOpen && (
+            <div className="advanced-filters-panel animate-fade-in card">
+              <div className="filter-grid">
+                <div className="filter-group-item">
+                  <label className="filter-label">Min ATS Match Score</label>
+                  <div className="slider-wrapper">
+                    <input type="range" min="50" max="95" value={minScoreFilter} onChange={(e) => setMinScoreFilter(parseInt(e.target.value))} />
+                    <span className="slider-value font-mono">{minScoreFilter}+</span>
+                  </div>
+                </div>
+
+                <div className="filter-group-item">
+                  <label className="filter-label">Max Expected CTC (LPA)</label>
+                  <div className="slider-wrapper">
+                    <input type="range" min="5" max="80" value={maxExpectedCtc} onChange={(e) => setMaxExpectedCtc(parseInt(e.target.value))} />
+                    <span className="slider-value font-mono">{maxExpectedCtc}L</span>
+                  </div>
+                </div>
+
+                <div className="filter-group-item">
+                  <label className="filter-label">Max Notice Period</label>
+                  <select className="input-text" value={noticePeriodFilter} onChange={(e) => setNoticePeriodFilter(e.target.value)}>
+                    <option value="any">Any Notice Period</option>
+                    <option value="immediate">Immediate Only</option>
+                    <option value="15">Within 15 Days</option>
+                    <option value="30">Within 30 Days</option>
+                    <option value="60">Within 60 Days</option>
+                  </select>
+                </div>
+
+                <div className="filter-group-item">
+                  <label className="filter-label">Pipeline Hiring Stage</label>
+                  <select className="input-text" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+                    <option value="all">All Stages</option>
+                    <option value="screening">Screening</option>
+                    <option value="shortlisted">Shortlisted</option>
+                    <option value="interviewing">Interviewing</option>
+                    <option value="offer">Offer Extended</option>
+                    <option value="hired">Hired 🎉</option>
+                    <option value="rejected">Declined</option>
+                  </select>
+                </div>
+
+                <div className="filter-group-item">
+                  <label className="filter-label">Candidate Location</label>
+                  <input type="text" className="input-text" placeholder="e.g. Pune, Bangalore" value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} />
+                </div>
+
+                <div className="filter-group-item reset-wrapper">
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      className="btn-secondary btn-clear-filters"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setMinScoreFilter(50);
+                        setMaxExpectedCtc(60);
+                        setNoticePeriodFilter('any');
+                        setLocationFilter('');
+                        setStageFilter('all');
+                        setVerdictFilter('all');
+                        setActiveSkillFilters([]);
+                        setSortBy('score_desc');
+                      }}
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Row 3: Active Filter Chips */}
+          {activeFilterCount > 0 && (
+            <div className="active-filters-chips-row">
+              <span className="chips-title">Active:</span>
+              {verdictFilter !== 'all' && <span className="filter-chip active-verdict" onClick={() => setVerdictFilter('all')}>Verdict: {verdictFilter} ✕</span>}
+              {stageFilter !== 'all' && <span className="filter-chip" onClick={() => setStageFilter('all')}>Stage: {stageFilter} ✕</span>}
+              {searchQuery.trim() !== '' && <span className="filter-chip" onClick={() => setSearchQuery('')}>Search: "{searchQuery.slice(0, 15)}" ✕</span>}
+              {minScoreFilter > 50 && <span className="filter-chip" onClick={() => setMinScoreFilter(50)}>Score ≥ {minScoreFilter} ✕</span>}
+              {maxExpectedCtc < 60 && <span className="filter-chip" onClick={() => setMaxExpectedCtc(60)}>Salary ≤ {maxExpectedCtc}L ✕</span>}
+              {noticePeriodFilter !== 'any' && <span className="filter-chip" onClick={() => setNoticePeriodFilter('any')}>Notice: {noticePeriodFilter === 'immediate' ? 'Immediate' : `≤${noticePeriodFilter}d`} ✕</span>}
+              {locationFilter.trim() !== '' && <span className="filter-chip" onClick={() => setLocationFilter('')}>Loc: {locationFilter} ✕</span>}
+              {activeSkillFilters.map(sk => <span key={sk} className="filter-chip active-skill" onClick={() => handleToggleSkillFilter(sk)}>Skill: {sk} ✕</span>)}
+              <span className="results-count-badge">{completedCandidates.filter(c => c.status === 'completed').length} matching profile(s)</span>
+            </div>
+          )}
+        </div>
+
+        {/* Skill Cloud filters */}
+        {hasCompleted && (
+          <div className="skill-cloud-card card">
+            <div className="card-header">
+              <span className="header-label">🔥 Skill Filter Cloud</span>
+              {activeSkillFilters.length > 0 && (
+                <button type="button" className="btn-secondary clear-skills-btn" onClick={() => setActiveSkillFilters([])}>Clear Tags</button>
+              )}
+            </div>
+            <div className="tags-container">
               {getTrendingSkills().map(skill => {
                 const isActive = activeSkillFilters.includes(skill);
                 return (
@@ -4761,21 +6419,6 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                     type="button"
                     className={`skill-tag-chip ${isActive ? 'active' : ''}`}
                     onClick={() => handleToggleSkillFilter(skill)}
-                    style={{
-                      background: isActive ? 'var(--color-terracotta)' : 'var(--color-paper-darker)',
-                      color: isActive ? 'var(--color-white)' : 'var(--color-ink-light)',
-                      border: '1px solid ' + (isActive ? 'var(--color-terracotta)' : 'var(--color-border)'),
-                      borderRadius: 'var(--radius-full)',
-                      padding: '0.35rem 0.85rem',
-                      fontSize: '0.78rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      boxShadow: isActive ? '0 0 10px var(--color-terracotta-light)' : 'none',
-                      transition: 'var(--transition-smooth)'
-                    }}
                   >
                     {skill} {isActive ? '✕' : ''}
                   </button>
@@ -4785,37 +6428,128 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           </div>
         )}
 
-        {/* Informative Dashboard summary */}
-        {completedCandidates.length > 0 && (
-          <div className="summary-bar animate-fade-in">
-            <div className="summary-item">
-              <span className="dot ready"></span>
-              <span className="stat-number">{stats.shortlisted}</span>
-              <span>shortlisted</span>
+        {/* Screening Actions and Drag Drop area */}
+        <div className="screening-workspace-grid">
+          {/* Uploader panel */}
+          <div className="card uploader-card">
+            <h3 className="card-title">Upload Candidates & Résumés</h3>
+            <div 
+              className={`dropzone ${dragActive ? 'active' : ''}`}
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => candidateFileInputRef.current?.click()}
+            >
+              <Upload size={28} className="upload-icon" />
+              <p className="main-prompt">Drag & drop resumes or <span className="browse-link">browse files</span></p>
+              <p className="sub-prompt">Supports PDF, DOCX, TXT, PNG, JPG, WEBP</p>
+              <input 
+                type="file" 
+                ref={candidateFileInputRef} 
+                style={{ display: 'none' }} 
+                multiple 
+                accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                onChange={handleBrowseFiles}
+              />
             </div>
-            <span style={{ color: 'var(--color-border)' }}>|</span>
-            <div className="summary-item">
-              <span className="dot reading"></span>
-              <span className="stat-number">{stats.borderline}</span>
-              <span>borderline</span>
+
+            {/* Paste Fallback alternative */}
+            <div className="paste-fallback-section">
+              <button 
+                type="button" 
+                className="btn-secondary btn-toggle-paste"
+                onClick={() => setPasteFallbackOpen(!pasteFallbackOpen)}
+              >
+                <span>Paste Resume Text Alternative</span>
+                {pasteFallbackOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {pasteFallbackOpen && (
+                <div className="paste-form animate-fade-in">
+                  <input type="text" className="input-text input-name" placeholder="Candidate Full Name" value={pasteName} onChange={(e) => setPasteName(e.target.value)} />
+                  <textarea className="input-textarea input-resume-text" placeholder="Paste full resume copy text..." value={pasteText} onChange={(e) => setPasteText(e.target.value)} />
+                  <button type="button" className="btn-primary btn-save-paste" onClick={handleAddManualCandidate} disabled={!pasteText.trim()}>Save Candidate</button>
+                </div>
+              )}
             </div>
-            <span style={{ color: 'var(--color-border)' }}>|</span>
-            <div className="summary-item">
-              <span className="dot error"></span>
-              <span className="stat-number">{stats.notFit}</span>
-              <span>not a fit</span>
-            </div>
-            <span style={{ color: 'var(--color-border)', marginLeft: 'auto' }}></span>
-            <div className="text-xs text-muted" style={{ marginLeft: 'auto', fontStyle: 'italic' }}>
-              Final outcomes subject to recruiter human verification.
+
+            {/* Screening trigger execution widget */}
+            <div className="screening-action-box">
+              <button 
+                type="button" 
+                className="btn-primary btn-screen-trigger"
+                onClick={handleScreenAndRank}
+                disabled={isScreening || readyCount === 0}
+              >
+                {isScreening ? (
+                  <>
+                    <RefreshCw className="spinner" size={16} />
+                    <span>Screening {currentScreenIndex + 1} of {candidates.length}...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>Run Screening Parser ({readyCount} Ready)</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
-        )}
 
-        {/* Selection Control Bar */}
+          {/* Queue file status list */}
+          <div className="card queue-card">
+            <div className="queue-header">
+              <h3 className="card-title">Candidates File Queue ({candidates.length})</h3>
+              {candidates.length > 0 && (
+                <button type="button" className="btn-clear-all" onClick={() => setCandidates([])}><Trash2 size={12} /> Clear Queue</button>
+              )}
+            </div>
+            
+            {candidates.length === 0 ? (
+              <div className="queue-empty-state">
+                <p>No documents uploaded yet. Upload PDF/Docx files to build screening queue.</p>
+              </div>
+            ) : (
+              <div className="file-list scroll-container">
+                {enrichedCandidates.map((candidate) => (
+                  <div key={candidate.id} className="file-row">
+                    <div className="file-info">
+                      <FileText size={16} className="file-icon" />
+                      <div className="meta">
+                        <span className="file-name">{candidate.name}</span>
+                        <span className="file-size">{formatBytes(candidate.fileSize)}</span>
+                      </div>
+                    </div>
+
+                    <div className="status-actions">
+                      {candidate.status === 'reading' && <span className="status-indicator reading"><span className="dot reading"></span>reading...</span>}
+                      {candidate.status === 'ocr_progress' && <span className="status-indicator ocr"><span className="dot ocr"></span>OCR {candidate.ocrProgress}%</span>}
+                      {candidate.status === 'ready' && <span className="status-indicator ready"><span className="dot ready"></span>Ready</span>}
+                      {candidate.status === 'screening' && <span className="status-indicator screening">Screening...</span>}
+                      {candidate.status === 'completed' && <span className="status-indicator score">Score: {candidate.score}</span>}
+                      {candidate.status === 'failed' && <span className="status-indicator error"><span className="dot error"></span>Failed</span>}
+                      
+                      <button type="button" className="btn-remove-row" onClick={() => removeCandidate(candidate.id)}><Trash2 size={12} /></button>
+                    </div>
+
+                    {candidate.status === 'failed' && (
+                      <div className="failed-error-panel animate-fade-in">
+                        <p className="error-text">Parse Error: {candidate.errorDetails}</p>
+                        <button type="button" className="btn-secondary" onClick={() => handleOcrRetry(candidate.id)}>Run OCR Retry</button>
+                        <textarea className="input-textarea fix-textarea" placeholder="Paste resume details manually to recover..." onChange={(e) => handleManualTextPasteFix(candidate.id, e.target.value)} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Batch selection status ribbon */}
         {completedScoredCandidates.length > 0 && (
-          <div className="selection-bar animate-fade-in">
-            <div className="flex items-center gap-3">
+          <div className="selection-action-bar animate-fade-in">
+            <div className="selection-status">
               <label className="checkbox-container">
                 <input 
                   type="checkbox"
@@ -4824,433 +6558,634 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 />
                 <span className="checkbox-checkmark"></span>
               </label>
-              <span className="text-sm font-semibold">
-                {selectedCandidateIds.length} of {completedScoredCandidates.length} Selected
-              </span>
+              <span>{selectedCandidateIds.length} of {completedScoredCandidates.length} Candidates Selected</span>
             </div>
-            
-            <div className="flex items-center gap-3">
+
+            <div className="action-buttons">
               {selectedCandidateIds.length > 1 && (
-                <button 
-                  type="button" 
-                  className="btn-primary select-compare-btn"
-                  style={{ width: 'auto', padding: '0.45rem 1rem', fontSize: '0.8rem', backgroundColor: 'var(--color-sage)' }}
-                  onClick={() => setIsCompareModalOpen(true)}
-                >
-                  <RefreshCw size={12} style={{ transform: 'rotate(90deg)' }} />
-                  <span>Compare ({selectedCandidateIds.length})</span>
-                </button>
+                <button type="button" className="btn-primary btn-compare" onClick={() => setIsCompareModalOpen(true)}>Compare ({selectedCandidateIds.length})</button>
               )}
               {selectedCandidateIds.length > 0 && (
-                <button 
-                  type="button" 
-                  className="btn-primary select-send-btn"
-                  style={{ width: 'auto', padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-                  onClick={handleOpenEmailModal}
-                >
-                  <Mail size={14} />
-                  <span>Send Batch Emails ({selectedCandidateIds.length})</span>
-                </button>
+                <button type="button" className="btn-primary btn-email" onClick={handleOpenEmailModal}>✉ Batch Email ({selectedCandidateIds.length})</button>
               )}
               {selectedCandidateIds.length > 0 && (
-                <button 
-                  type="button" 
-                  className="btn-secondary select-export-btn"
-                  style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
-                  onClick={handleExportCsv}
-                >
-                  Export CSV ({selectedCandidateIds.length})
-                </button>
+                <button type="button" className="btn-secondary btn-export" onClick={handleExportCsv}>Export CSV ({selectedCandidateIds.length})</button>
               )}
-              <button 
-                type="button" 
-                className="btn-secondary"
-                style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
-                onClick={() => setSelectedCandidateIds([])}
-                disabled={selectedCandidateIds.length === 0}
-              >
-                Clear Selection
-              </button>
+              <button type="button" className="btn-secondary" onClick={() => setSelectedCandidateIds([])} disabled={selectedCandidateIds.length === 0}>Clear Selection</button>
             </div>
           </div>
         )}
 
-        {/* Results Screen */}
-        {!enrichedCandidates.some(c => c.status === 'completed' || c.status === 'screening' || c.status === 'failed') ? (
-          <div className="card text-center animate-fade-in" style={{ padding: '6rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem', borderStyle: 'dashed' }}>
-            <span style={{ fontSize: '3rem' }}>📁</span>
-            <div>
-              <h3 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>No Screenings Conducted Yet</h3>
-              <p style={{ maxWidth: '480px', margin: '0 auto', fontSize: '0.95rem' }} className="text-muted">
-                Set up your Job Details, upload résumés in the setup panel on the left, and trigger the batch screen to rank candidates.
-              </p>
-            </div>
-            <div className="flex gap-4 justify-center" style={{ marginTop: '1rem', flexWrap: 'wrap' }}>
-              <div className="flex items-center gap-1 text-xs text-muted">
-                <Check size={14} style={{ color: 'var(--color-sage)' }} /> PDF/Word Text Extraction
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted">
-                <Check size={14} style={{ color: 'var(--color-sage)' }} /> Dynamic OCR Fallbacks
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted">
-                <Check size={14} style={{ color: 'var(--color-sage)' }} /> Bias-Free Weighted Scoring
-              </div>
-            </div>
-          </div>
-        ) : completedCandidates.length === 0 ? (
-          <div className="card text-center animate-fade-in" style={{ padding: '4rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.25rem', borderStyle: 'dashed' }}>
-            <span style={{ fontSize: '2.5rem' }}>🔍</span>
-            <div>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>No Matching Candidates Found</h3>
-              <p style={{ maxWidth: '480px', margin: '0 auto', fontSize: '0.9rem' }} className="text-muted">
-                No candidates scored {minScoreFilter}+ or matched your keyword search query. Try clearing your filters.
-              </p>
-            </div>
-            <button 
-              type="button" 
-              className="btn-primary" 
-              style={{ width: 'auto', padding: '0.55rem 1.75rem', fontSize: '0.85rem' }}
-              onClick={() => { setSearchQuery(''); setMinScoreFilter(50); }}
-            >
-              Reset Filters
-            </button>
-          </div>
-        ) : viewMode === 'analytics' ? (
-          renderAnalyticsDashboard()
-        ) : viewMode === 'kanban' ? (
-          renderKanbanBoard()
-        ) : (
-          <div className="candidate-grid">
-            {completedCandidates.map((candidate, idx) => {
-              if (candidate.status === 'screening') {
-                return (
-                  <div key={candidate.id} className="candidate-card" style={{ opacity: 0.7, borderStyle: 'dashed', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3.5rem' }}>
-                    <RefreshCw className="spinner" size={32} style={{ animation: 'spin 1.5s linear infinite', color: 'var(--color-terracotta)' }} />
-                    <div className="text-center" style={{ marginTop: '1rem' }}>
-                      <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem' }}>Screening Profile</h4>
-                      <p className="text-sm text-muted">{candidate.name}</p>
-                      <p className="text-xs mono-font" style={{ color: 'var(--color-terracotta)', marginTop: '0.25rem' }}>Running offline ATS engine...</p>
+        {/* Candidates output display */}
+        <div className="candidates-list-workspace">
+          {viewMode === 'analytics' ? (
+            renderAnalyticsDashboard()
+          ) : viewMode === 'kanban' ? (
+            renderKanbanBoard()
+          ) : (
+            <div className="candidate-grid">
+              {completedCandidates.map((candidate, idx) => {
+                if (candidate.status === 'screening') {
+                  return (
+                    <div key={candidate.id} className="candidate-card screening-card animate-pulse card">
+                      <RefreshCw className="spinner" size={28} />
+                      <h4>Screening Profile</h4>
+                      <p>{candidate.name}</p>
                     </div>
-                  </div>
-                );
-              }
+                  );
+                }
 
-              if (candidate.status === 'failed') {
-                return (
-                  <div key={candidate.id} className="candidate-card" style={{ borderColor: 'var(--color-red)' }}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle size={24} style={{ color: 'var(--color-red)' }} />
-                        <div>
-                          <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: 'var(--color-red)' }}>Screening Failed</h4>
-                          <p className="text-sm text-muted">{candidate.name}</p>
-                        </div>
+                if (candidate.status === 'failed') {
+                  return (
+                    <div key={candidate.id} className="candidate-card failed-card card">
+                      <div className="card-header">
+                        <h4>Parse Failed</h4>
+                        <span>{candidate.name}</span>
                       </div>
-                      <button 
-                        type="button" 
-                        className="btn-secondary" 
-                        style={{ borderColor: 'var(--color-red)', color: 'var(--color-red)' }}
-                        onClick={() => {
-                          // Trigger screening specifically for this candidate again
-                          // By setting status to 'ready' and triggering screening
-                          setCandidates(prev => prev.map(c => {
-                            if (c.id === candidate.id) return { ...c, status: 'ready' };
-                            return c;
-                          }));
-                          // Delay slightly then run screening
-                          setTimeout(() => {
-                            handleScreenAndRank();
-                          }, 100);
-                        }}
-                      >
-                        Retry Screen
-                      </button>
+                      <p className="error-text">Details: {candidate.errorDetails}</p>
                     </div>
-                    <div className="file-fallback-box" style={{ marginTop: '1rem', backgroundColor: 'var(--color-red-light)', borderColor: 'rgba(197, 83, 83, 0.15)' }}>
-                      <span className="text-sm font-semibold text-ink">Details:</span>
-                      <p className="text-xs" style={{ color: 'var(--color-red)', marginTop: '0.2rem', whiteSpace: 'pre-wrap' }}>
-                        {candidate.errorDetails}
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
+                  );
+                }
 
-              // Normal Completed Scored Candidate Card
-              const displayScore = getCandidateDisplayScore(candidate);
-              const outcome = getNextStepDetails(displayScore, threshold);
-              const evalData = candidate.evaluation || analyzeCandidateOffline(candidate, jobTitle, jobDescription, mustHaves);
-              
-              // Match Flags calculations
-              const isUnderBudget = (evalData.expected_ctc || candidate.expectedCtc || 0) <= 25;
-              const isShortNotice = ['Immediate', '15 days', '30 days'].includes(evalData.notice_period || candidate.noticePeriod);
-              
-              const scorecard = candidate.scorecard || { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "" };
-              const { technical, communication, problemSolving, cultureFit } = scorecard;
-              const avgRating = (technical + communication + problemSolving + cultureFit) / 4;
-              
-              const logs = evalData.activity_log || candidate.activityLog || [];
-              const lastLog = logs.length > 0 ? logs[logs.length - 1] : null;
+                const displayScore = getCandidateDisplayScore(candidate);
+                const outcome = getNextStepDetails(displayScore, threshold);
+                const evalData = candidate.evaluation || analyzeCandidateOffline(candidate, jobTitle, jobDescription, mustHaves);
+                const isUnderBudget = (evalData.expected_ctc || candidate.expectedCtc || 0) <= 25;
+                const isShortNotice = ['Immediate', '15 days', '30 days'].includes(evalData.notice_period || candidate.noticePeriod);
 
-              return (
-                <article key={candidate.id} className="candidate-card animate-fade-in" style={{ animationDelay: `${idx * 0.1}s`, borderLeft: candidate.stage === 'hired' ? '4px solid var(--color-sage)' : candidate.stage === 'rejected' ? '4px solid var(--color-red)' : '' }}>
-                  
-                  {candidate.stage === 'hired' && (
-                    <div className="celebration-ribbon animate-pulse" style={{ background: 'var(--color-sage-light)', color: 'var(--color-sage)', padding: '0.35rem 1rem', fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.35rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(95,125,101,0.2)' }}>
-                      🎉 HIRED CANDIDATE! Onboarding in progress
-                    </div>
-                  )}
-
-                  {/* Card Header: Rank, Name, Badges, & Score */}
-                  <div className="candidate-card-header">
-                    <div className="flex items-start gap-3 flex-1" style={{ minWidth: 0 }}>
-                      <label className="checkbox-container" style={{ marginTop: '0.35rem' }}>
-                        <input 
-                          type="checkbox"
-                          checked={selectedCandidateIds.includes(candidate.id)}
-                          onChange={() => handleToggleSelectCandidate(candidate.id)}
-                        />
+                return (
+                  <article 
+                    key={candidate.id} 
+                    className={`candidate-card card ${outcome.badgeClass}`}
+                    onClick={() => {
+                      setDrawerActiveTab('overview');
+                      setActiveDrawerCandidateId(candidate.id);
+                    }}
+                  >
+                    <div className="card-top" onClick={(e) => e.stopPropagation()}>
+                      <label className="checkbox-container">
+                        <input type="checkbox" checked={selectedCandidateIds.includes(candidate.id)} onChange={() => handleToggleSelectCandidate(candidate.id)} />
                         <span className="checkbox-checkmark"></span>
                       </label>
-                      <div className="candidate-meta" style={{ minWidth: 0 }}>
-                        <div className="candidate-rank-name" style={{ display: 'flex', alignItems: 'center', gap: '0.50rem', flexWrap: 'wrap' }}>
-                          <span className="candidate-rank">Rank #{idx + 1}</span>
-                          <h3 className="candidate-name" style={{ margin: 0 }}>{evalData.candidate_name || candidate.name}</h3>
-                          
-                          {/* Notice Period, Expected CTC & Location Tags */}
-                          <span className="keyword-chip matched" style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', backgroundColor: 'var(--color-terracotta-light)', color: 'var(--color-terracotta)', borderColor: 'rgba(200,90,50,0.1)' }}>
-                            ⚡ {evalData.notice_period || candidate.noticePeriod}
-                          </span>
-                          <span className="keyword-chip matched" style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', backgroundColor: 'rgba(78, 194, 116, 0.08)', color: 'var(--color-sage)', borderColor: 'rgba(78,194,116,0.1)' }}>
-                            💰 {evalData.expected_ctc || candidate.expectedCtc} LPA
-                          </span>
-                          <span className="keyword-chip matched" style={{ fontSize: '0.68rem', padding: '0.15rem 0.45rem', backgroundColor: 'var(--color-gold-light)', color: 'var(--color-gold)', borderColor: 'rgba(192,154,85,0.1)' }}>
-                            📍 {evalData.location || candidate.location}
-                          </span>
+                      
+                      <div className="candidate-meta-details">
+                        <div className="name-row">
+                          <span className="rank-badge">Rank #{idx + 1}</span>
+                          <h3 className="name">{evalData.candidate_name || candidate.name}</h3>
                         </div>
-                        
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span className={`candidate-verdict ${outcome.badgeClass}`}>
-                            {outcome.badge} Match
-                          </span>
-                          {sentEmails[candidate.id] && (
-                            <span className="candidate-verdict shortlisted" style={{ backgroundColor: 'var(--color-sage-light)', color: 'var(--color-sage)', border: '1px solid rgba(95, 125, 101, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <CheckCircle size={11} /> Email Sent
-                            </span>
-                          )}
-                          {candidate.interview && (
-                            <span className="candidate-verdict shortlisted" style={{ backgroundColor: 'var(--color-gold-light)', color: 'var(--color-gold)', border: '1px solid rgba(192, 154, 85, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                              📅 Interview Scheduled
-                            </span>
-                          )}
-                          <span className="text-xs text-muted">•</span>
-                          <span className="text-xs text-muted mono-font">{candidate.fileName}</span>
+                        <div className="meta-tags">
+                          <span className="tag">⚡ {evalData.notice_period || candidate.noticePeriod}</span>
+                          <span className="tag">💰 {evalData.expected_ctc || candidate.expectedCtc} LPA</span>
+                          <span className="tag">📍 {evalData.location || candidate.location}</span>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="candidate-score-container" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div className={`candidate-score-badge ${displayScore >= threshold ? 'high' : displayScore >= threshold - 15 ? 'medium' : 'low'}`}>
-                        <span className="candidate-score-val">{displayScore}</span>
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '0.62rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)', fontWeight: '750', letterSpacing: '0.05em', lineHeight: '1' }}>overall</span>
-                        <span style={{ fontSize: '0.82rem', fontWeight: '800', color: 'var(--color-ink-light)', lineHeight: '1.2', marginTop: '0.15rem' }}>alignment</span>
+                      <div className="score-meter">
+                        <div className={`score-badge ${displayScore >= threshold ? 'high' : displayScore >= threshold - 15 ? 'medium' : 'low'}`}>
+                          {displayScore}
+                        </div>
+                        <span className="score-label">ATS Score</span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Quick assessment match flags */}
-                  <div style={{ display: 'flex', gap: '0.5rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
-                    {isUnderBudget ? (
-                      <span style={{ color: 'var(--color-sage)', display: 'flex', alignItems: 'center', gap: '0.15rem', fontWeight: '600' }}>
-                        ✓ Under Budget
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--color-red)', display: 'flex', alignItems: 'center', gap: '0.15rem', fontWeight: '600' }}>
-                        ⚠ Over Budget (≤25L budget)
-                      </span>
-                    )}
-                    <span style={{ color: 'var(--color-ink-muted)' }}>|</span>
-                    {isShortNotice ? (
-                      <span style={{ color: 'var(--color-sage)', display: 'flex', alignItems: 'center', gap: '0.15rem', fontWeight: '600' }}>
-                        ✓ Fast Joiner (≤30d)
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--color-red)', display: 'flex', alignItems: 'center', gap: '0.15rem', fontWeight: '600' }}>
-                        ⚠ Long Notice ({evalData.notice_period || candidate.noticePeriod})
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Summary phrase */}
-                  <p className="text-sm" style={{ fontStyle: 'italic', borderLeft: '2px solid var(--color-terracotta)', paddingLeft: '0.75rem', color: 'var(--color-ink-light)' }}>
-                    "{evalData.summary}"
-                  </p>
-
-                  {/* Card quick star rating */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '0.50rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.50rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Quick Assessment:</span>
-                      <div style={{ display: 'flex' }}>
-                        {[1, 2, 3, 4, 5].map(star => (
-                          <button
-                            key={star}
-                            type="button"
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontSize: '1rem',
-                              color: star <= Math.round(avgRating) ? 'var(--color-gold)' : 'var(--color-border-hover)',
-                              padding: '0 0.05rem'
-                            }}
-                            onClick={() => updateScorecardField(candidate.id, 'technical', star)} // quick rating updates technical
-                          >
-                            ★
-                          </button>
-                        ))}
+                    <div className="card-body">
+                      <div className="verdict-banner">
+                        <span className={`verdict ${outcome.badgeClass}`}>{outcome.badge} Match</span>
+                        {candidate.interview && <span className="verdict scheduled">📅 Interview</span>}
+                        {sentEmails[candidate.id] && <span className="verdict emailed">✉ Emailed</span>}
                       </div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--color-ink-light)' }}>({avgRating.toFixed(1)})</span>
-                    </div>
 
-                    {candidate.stage === 'rejected' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--color-red)' }}>Reason:</span>
-                        <select
-                          className="text-xs"
-                          style={{ padding: '0.15rem 0.35rem', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-red)' }}
-                          value={candidate.rejectionReason || 'tech_failed'}
-                          onChange={(e) => handleMoveStage(candidate.id, 'rejected', e.target.value)}
-                        >
-                          <option value="expected_ctc">CTC too high</option>
-                          <option value="notice_period">Notice too long</option>
-                          <option value="tech_failed">Failed Tech round</option>
-                          <option value="poor_communication">Poor communication</option>
-                          <option value="other">Other</option>
-                        </select>
+                      <div className="strengths-risks-preview">
+                        <div className="strengths">
+                          <strong>Strengths:</strong>
+                          <p>{evalData.strengths?.[0] || 'Standard skillset matched'}</p>
+                        </div>
+                        <div className="risks">
+                          <strong>Risks:</strong>
+                          <p>{evalData.risks?.[0] || 'No critical risks identified'}</p>
+                        </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Timeline last action log */}
-                  {lastLog && (
-                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', fontSize: '0.75rem', color: 'var(--color-ink-muted)', width: '100%' }}>
-                      <span style={{ color: 'var(--color-terracotta)' }}>●</span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}><strong>Activity:</strong> {lastLog.text}</span>
-                      <span style={{ marginLeft: 'auto', fontStyle: 'italic', fontSize: '0.7rem' }}>{lastLog.timestamp}</span>
-                    </div>
-                  )}
-
-                  {/* Actions Bar */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', gap: '0.50rem' }}>
-                      <button 
-                        type="button" 
-                        className="btn-primary text-xs" 
-                        style={{ padding: '0.40rem 0.85rem', fontSize: '0.78rem', width: 'auto', backgroundColor: 'var(--color-ink)', background: 'var(--color-ink)', boxShadow: 'none' }}
-                        onClick={() => {
-                          setDrawerActiveTab('overview');
-                          setActiveDrawerCandidateId(candidate.id);
-                        }}
-                      >
-                        <Eye size={12} /> Profile & Timeline
-                      </button>
-
-                      <button 
-                        type="button" 
-                        className="btn-secondary text-xs" 
-                        style={{ padding: '0.40rem 0.85rem', fontSize: '0.78rem', width: 'auto' }}
-                        onClick={() => {
-                          setDrawerActiveTab('scorecard');
-                          setActiveDrawerCandidateId(candidate.id);
-                        }}
-                      >
-                        Evaluate
-                      </button>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="card-footer" onClick={(e) => e.stopPropagation()}>
                       <select 
-                        className="text-xs" 
-                        style={{ padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)', background: 'none', color: 'var(--color-ink)' }}
-                        value={candidate.stage || 'screening'}
+                        value={candidate.stage || 'screening'} 
                         onChange={(e) => handleMoveStage(candidate.id, e.target.value)}
+                        className="stage-dropdown"
                       >
                         <option value="screening">Screening</option>
                         <option value="shortlisted">Shortlist</option>
                         <option value="interviewing">Interview</option>
-                        <option value="offer">Offer</option>
+                        <option value="offer">Offer Extended</option>
                         <option value="hired">Hired 🎉</option>
                         <option value="rejected">Decline</option>
                       </select>
 
-                      {sentEmails[candidate.id] && (
-                        <span className="text-xs text-sage font-bold" style={{ display: 'flex', alignItems: 'center', gap: '0.15rem', color: 'var(--color-sage)' }}>
-                          <CheckCircle size={10} /> Sent
-                        </span>
-                      )}
+                      <div className="footer-actions">
+                        <button type="button" className="btn-secondary" onClick={() => handleDraftEmail(candidate)}>Draft Email</button>
+                      </div>
                     </div>
-                  </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-                  {/* Recommended template composer inline banner */}
-                  {!sentEmails[candidate.id] && (
-                    <div className={outcome.bannerClass} style={{ marginTop: '0.25rem' }}>
-                      <div className="action-banner-header" style={{ padding: '0.5rem 0.75rem' }}>
-                        <div className="action-title-group">
-                          <span className="action-title" style={{ fontSize: '0.75rem' }}>Recommended Step: {outcome.title}</span>
-                        </div>
-                        <div className="action-button-container">
-                          <button 
-                            type="button" 
-                            className="btn-primary text-xs" 
-                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.70rem', width: 'auto' }}
-                            onClick={() => handleDraftEmail(candidate)}
-                            disabled={isDraftingId === candidate.id}
-                          >
-                            {isDraftingId === candidate.id ? "Drafting..." : "Draft Email"}
-                          </button>
+  const renderCareersView = () => {
+    return (
+      <div className="careers-view-panel animate-fade-in">
+        <div className="view-header">
+          <h2>Branded Careers Page Portal</h2>
+          <p className="subtitle">Customize visual styles and test the public candidate application portal. Form inputs directly parse submissions into the ATS screening queue.</p>
+        </div>
+
+        <div className="careers-layout-grid card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', minHeight: '600px', flex: 1 }}>
+            {/* Customizer Panel */}
+            <div className="customizer-panel" style={{ width: '280px', borderRight: '1px solid var(--color-border)', backgroundColor: 'var(--color-paper-darker)', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <span className="panel-section-title" style={{ fontWeight: '800', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)' }}>Visual Settings</span>
+              
+              <div className="form-group">
+                <label className="form-label text-xs">Color Palette</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {[
+                    { id: 'indigo', name: 'Indigo Corporate 🔵', color: '#4F46E5' },
+                    { id: 'emerald', name: 'Emerald Creative 🟢', color: '#10B981' },
+                    { id: 'terracotta', name: 'Terracotta Warm 🟤', color: '#C85A32' }
+                  ].map(thm => (
+                    <button
+                      key={thm.id}
+                      type="button"
+                      onClick={() => setCareersTheme(thm.id)}
+                      className={`btn-secondary ${careersTheme === thm.id ? 'active' : ''}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-start',
+                        border: '1.5px solid ' + (careersTheme === thm.id ? thm.color : 'var(--color-border)'),
+                        background: careersTheme === thm.id ? 'var(--color-white)' : 'transparent',
+                        padding: '0.5rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer', borderRadius: '6px'
+                      }}
+                    >
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: thm.color, display: 'inline-block' }} />
+                      {thm.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label text-xs">Font Typography</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {[
+                    { id: 'sans', name: 'Modern Sans-Serif', family: 'var(--font-body)' },
+                    { id: 'serif', name: 'Elegant Serif', family: 'var(--font-display)' },
+                    { id: 'mono', name: 'Technical Monospace', family: 'var(--font-mono)' }
+                  ].map(fnt => (
+                    <button
+                      key={fnt.id}
+                      type="button"
+                      onClick={() => setCareersFont(fnt.id)}
+                      className={`btn-secondary ${careersFont === fnt.id ? 'active' : ''}`}
+                      style={{
+                        justifyContent: 'flex-start', padding: '0.5rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer', borderRadius: '6px',
+                        border: '1.5px solid ' + (careersFont === fnt.id ? 'var(--color-terracotta)' : 'var(--color-border)'),
+                        background: careersFont === fnt.id ? 'var(--color-white)' : 'transparent',
+                        fontFamily: fnt.family
+                      }}
+                    >
+                      {fnt.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Portal Live Preview */}
+            {(() => {
+              let primaryColor = '#4F46E5';
+              let hoverColor = '#4338CA';
+              let lightColor = '#EEF2F6';
+              
+              if (careersTheme === 'emerald') {
+                primaryColor = '#10B981';
+                hoverColor = '#059669';
+                lightColor = '#ECFDF5';
+              } else if (careersTheme === 'terracotta') {
+                primaryColor = '#C85A32';
+                hoverColor = '#AF4B27';
+                lightColor = '#F9EFEA';
+              }
+
+              let fontStyle = 'var(--font-body)';
+              if (careersFont === 'serif') fontStyle = 'var(--font-display)';
+              else if (careersFont === 'mono') fontStyle = 'var(--font-mono)';
+
+              const handleCareersSubmit = (e) => {
+                e.preventDefault();
+                if (!appFormName || !appFormEmail || !appFormResume) {
+                  alert("Please fill in all fields.");
+                  return;
+                }
+                const candidateId = Math.random().toString(36).substring(7);
+                const newCandidate = {
+                  id: candidateId,
+                  name: appFormName,
+                  fileName: 'Careers_Portal_Submission.txt',
+                  fileSize: appFormResume.length,
+                  status: 'ready',
+                  ocrProgress: 0,
+                  text: `${appFormName}\nEmail: ${appFormEmail}\n\nResume Details:\n${appFormResume}`,
+                  numChars: appFormResume.length,
+                  errorDetails: '',
+                  score: null,
+                  evaluation: null,
+                  stage: 'screening',
+                  activityLog: [
+                    { id: 1, type: "applied", text: "Candidate applied directly via public careers portal", timestamp: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+                  ]
+                };
+                
+                setCandidates(prev => [...prev, newCandidate]);
+                setAppSubmitted(true);
+                setTimeout(() => {
+                  setAppFormName('');
+                  setAppFormEmail('');
+                  setAppFormResume('');
+                  setAppSubmitted(false);
+                  alert(`🎉 Application received! ${appFormName} has been loaded into your screening queue.`);
+                }, 1200);
+              };
+
+              return (
+                <div style={{ flex: 1, padding: '2.5rem', overflowY: 'auto', backgroundColor: '#FFFFFF', fontFamily: fontStyle, color: '#1E293B' }}>
+                  {appSubmitted ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '1rem', textAlign: 'center' }}>
+                      <div style={{ width: '60px', height: '60px', borderRadius: '50%', border: `3px solid ${primaryColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={32} style={{ color: primaryColor }} />
+                      </div>
+                      <h4 style={{ fontSize: '1.25rem', color: primaryColor, margin: 0 }}>Application Transmitting...</h4>
+                      <p className="text-sm text-muted">Injecting application data into RecruitPro ATS dashboard</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      <div style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '1.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase', color: primaryColor, letterSpacing: '0.05em' }}>Public Opening</span>
+                        <h2 style={{ fontSize: '1.75rem', color: '#0F172A', margin: '0.25rem 0' }}>{jobTitle}</h2>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                          <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', background: '#F1F5F9', borderRadius: '4px' }}>📍 Bangalore, IN</span>
+                          <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', background: '#F1F5F9', borderRadius: '4px' }}>💼 Full-Time</span>
+                          <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', background: '#F1F5F9', borderRadius: '4px' }}>💰 Competitive Salary</span>
                         </div>
                       </div>
-                      
-                      {emailDrafts[candidate.id] && (
-                        <div className="email-draft-box animate-fade-in" style={{ margin: '0.5rem', padding: '0.5rem' }}>
-                          <div className="email-draft-header">
-                            <span className="email-draft-title" style={{ fontSize: '0.72rem' }}>Recruiter Email Draft</span>
-                            <div className="flex gap-1">
-                              <button 
-                                type="button" 
-                                className="btn-secondary" 
-                                style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }}
-                                onClick={() => handleCopyEmail(candidate.id)}
-                              >
-                                Copy
-                              </button>
-                              <button 
-                                type="button" 
-                                className="btn-primary" 
-                                style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem', width: 'auto', backgroundColor: 'var(--color-sage)' }}
-                                onClick={() => handleSendSingleEmail(candidate)}
-                              >
-                                Send
-                              </button>
+
+                      <div>
+                        <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--color-ink-muted)', marginBottom: '0.5rem' }}>Requirements Description</h4>
+                        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', padding: '1rem', borderRadius: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                          <pre style={{ fontFamily: 'inherit', fontSize: '0.85rem', whiteSpace: 'pre-wrap', color: '#334155', margin: 0, lineHeight: '1.5' }}>{jobDescription}</pre>
+                        </div>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+                        <h3 style={{ fontSize: '1.1rem', color: primaryColor, marginBottom: '1rem' }}>Submit Application Form</h3>
+                        <form onSubmit={handleCareersSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label text-xs">Full Name</label>
+                              <input type="text" className="input-text" placeholder="e.g. Rohan Sharma" value={appFormName} onChange={(e) => setAppFormName(e.target.value)} required />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                              <label className="form-label text-xs">Email Address</label>
+                              <input type="email" className="input-text" placeholder="e.g. rohan@email.com" value={appFormEmail} onChange={(e) => setAppFormEmail(e.target.value)} required />
                             </div>
                           </div>
-                          <pre className="email-draft-body" style={{ maxHeight: '80px', fontSize: '0.72rem' }}>
-                            {emailDrafts[candidate.id]}
-                          </pre>
-                        </div>
-                      )}
+                          <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label className="form-label text-xs">Paste Resume Content Text</label>
+                            <textarea className="input-textarea" style={{ minHeight: '120px' }} placeholder="Paste your detailed resume profile bio here..." value={appFormResume} onChange={(e) => setAppFormResume(e.target.value)} required />
+                          </div>
+                          <button
+                            type="submit"
+                            className="btn-primary"
+                            style={{
+                              width: 'auto', alignSelf: 'flex-start', padding: '0.6rem 1.75rem', fontSize: '0.85rem',
+                              background: `linear-gradient(135deg, ${primaryColor}, ${hoverColor})`, boxShadow: 'none'
+                            }}
+                          >
+                            Submit Online Application
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   )}
-                </article>
+                </div>
               );
-            })}
+            })()}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTemplatesView = () => {
+    return (
+      <div className="templates-view-panel animate-fade-in">
+        <div className="view-header">
+          <h2>Email Templates Customizer & Queue</h2>
+          <p className="subtitle">Configure and customize standardized email layouts for candidate status updates. Insert dynamic placeholders for personalized mail drafts.</p>
+        </div>
+
+        <div className="templates-layout-grid">
+          {/* Templates list card */}
+          <div className="templates-list-card card">
+            <h3 className="card-title">Base Layouts</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+              {emailTemplates.map(t => {
+                const isActive = selectedTemplateId === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`btn-secondary ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedTemplateId(t.id);
+                      setTempSubject(t.subject);
+                      setTempBody(t.body);
+                    }}
+                    style={{
+                      justifyContent: 'flex-start', padding: '0.6rem 1rem', fontSize: '0.85rem', cursor: 'pointer', borderRadius: '6px',
+                      border: '1.5px solid ' + (isActive ? 'var(--color-terracotta)' : 'var(--color-border)'),
+                      background: isActive ? 'var(--color-terracotta-light)' : 'transparent',
+                      color: isActive ? 'var(--color-terracotta)' : 'var(--color-ink)'
+                    }}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Template editor card */}
+          {(() => {
+            const activeTemplate = emailTemplates.find(x => x.id === selectedTemplateId) || emailTemplates[0];
+            
+            const handleEditorSave = () => {
+              setEmailTemplates(prev => prev.map(t => {
+                if (t.id === selectedTemplateId) {
+                  return { ...t, subject: tempSubject, body: tempBody };
+                }
+                return t;
+              }));
+              alert("🎉 Template updated and saved successfully!");
+            };
+
+            const insertTextPlaceholder = (target, value) => {
+              insertPlaceholder(target, value);
+            };
+
+            return (
+              <div className="template-editor-card card">
+                <div className="editor-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                  <h3 className="card-title">Edit Template: <span style={{ color: 'var(--color-terracotta)' }}>{activeTemplate.name}</span></h3>
+                  <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0.45rem 1.25rem', fontSize: '0.85rem' }} onClick={handleEditorSave}>Save Template Changes</button>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Subject Pattern</label>
+                  <input
+                    type="text"
+                    ref={tempSubjectRef}
+                    className="input-text text-sm"
+                    value={tempSubject}
+                    onChange={(e) => setTempSubject(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.25rem' }}>
+                    {['{{candidateName}}', '{{jobTitle}}', '{{matchedSkills}}'].map(tag => (
+                      <button key={tag} type="button" className="btn-secondary" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem' }} onClick={() => insertTextPlaceholder('subject', tag)}>+ {tag}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Email Body Template</label>
+                  <textarea
+                    ref={tempBodyRef}
+                    className="input-textarea template-body-textarea"
+                    style={{ minHeight: '220px', fontSize: '0.88rem' }}
+                    value={tempBody}
+                    onChange={(e) => tempBodyRef.current ? setTempBody(e.target.value) : setTempBody(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                    {['{{candidateName}}', '{{jobTitle}}', '{{matchedSkills}}'].map(tag => (
+                      <button key={tag} type="button" className="btn-secondary" style={{ padding: '0.15rem 0.4rem', fontSize: '0.65rem' }} onClick={() => insertTextPlaceholder('body', tag)}>+ {tag}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Sent Emails History Queue */}
+        {Object.keys(sentEmails).length > 0 && (
+          <div className="sent-emails-queue card" style={{ marginTop: '1.5rem' }}>
+            <h3 className="card-title">Sent Emails Logs History ({Object.keys(sentEmails).length})</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+              {Object.entries(sentEmails).map(([id, details]) => {
+                const candidate = candidates.find(c => c.id === id);
+                return (
+                  <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.85rem', border: '1px solid var(--color-border)', borderRadius: '6px', backgroundColor: 'var(--color-paper-light)', fontSize: '0.82rem' }}>
+                    <div>
+                      <strong style={{ color: 'var(--color-ink)' }}>{candidate?.name || 'Candidate'}</strong>
+                      <span className="text-muted" style={{ margin: '0 0.5rem' }}>→</span>
+                      <span className="mono-font" style={{ color: 'var(--color-terracotta)' }}>{details.email}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <span className="text-xs text-muted">Sent at: {details.sentAt}</span>
+                      <span style={{ color: 'var(--color-sage)', fontWeight: 'bold' }}>✓ Dispatched</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
-      </main>
+      </div>
+    );
+  };
+
+  const renderSettingsView = () => {
+    const sqlScript = `-- SQL DDL setup for RecruitPro ATS
+CREATE TABLE IF NOT EXISTS public.jobs (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  "mustHaves" TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.jobs DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.candidates (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  "fileName" TEXT,
+  "fileSize" INTEGER,
+  status TEXT,
+  "ocrProgress" INTEGER,
+  text TEXT,
+  "numChars" INTEGER,
+  "errorDetails" TEXT,
+  score INTEGER,
+  stage TEXT,
+  "noticePeriod" TEXT,
+  "currentCtc" NUMERIC,
+  "expectedCtc" NUMERIC,
+  location TEXT,
+  "preferredLocation" TEXT,
+  "resumeQuality" INTEGER,
+  evaluation JSONB,
+  scorecard JSONB,
+  "activityLog" JSONB,
+  "jobsData" JSONB,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.candidates DISABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.email_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  subject TEXT,
+  body TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
+
+    return (
+      <div className="settings-view-panel animate-fade-in">
+        <div className="view-header">
+          <h2>System Configuration & Database Setup</h2>
+          <p className="subtitle">Tune candidate screening parameters and verify live external database integrations.</p>
+        </div>
+
+        <div className="settings-layout-grid">
+          {/* Threshold slider card */}
+          <div className="threshold-card card">
+            <h3 className="card-title">Hiring Threshold Scorecard</h3>
+            <p className="help-text" style={{ marginBottom: '1.25rem' }}>Adjust the minimum weighted match percentage needed to mark profiles as Shortlisted.</p>
+            
+            <div className="slider-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                <span className="text-muted">Shortlist Bar</span>
+                <span style={{ color: 'var(--color-terracotta)', fontSize: '1.1rem' }}>{threshold} / 100</span>
+              </div>
+              <input 
+                type="range" 
+                min="50" 
+                max="95" 
+                value={threshold} 
+                onChange={(e) => setThreshold(parseInt(e.target.value))}
+                style={{ width: '100%', cursor: 'pointer' }}
+              />
+              <span className="text-xs text-muted" style={{ marginTop: '0.25rem' }}>Candidates matching lower than {threshold}% will default to Borderline or Decline recommendation filters.</span>
+            </div>
+          </div>
+
+          {/* Supabase status verification card */}
+          <div className="supabase-card card">
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+              <h3 className="card-title">Supabase Database Integration</h3>
+              <span className={`status-badge-text font-mono ${supabaseStatus}`} style={{
+                fontSize: '0.75rem', fontWeight: 'bold', padding: '0.25rem 0.6rem', borderRadius: '4px',
+                backgroundColor: supabaseStatus === 'connected' ? 'var(--color-sage-light)' : supabaseStatus === 'schema_missing' ? '#FEF3C7' : 'var(--color-red-light)',
+                color: supabaseStatus === 'connected' ? 'var(--color-sage)' : supabaseStatus === 'schema_missing' ? 'orange' : 'var(--color-red)'
+              }}>
+                {supabaseStatus.toUpperCase()}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-secondary" onClick={() => verifySupabaseConnection(true)}>Verify Sync Connection</button>
+                {supabaseStatus === 'connected' && (
+                  <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0.45rem 1.25rem' }} onClick={seedSupabase} disabled={isSeeding}>
+                    {isSeeding ? 'Seeding...' : 'Seed Sample Database Records'}
+                  </button>
+                )}
+              </div>
+
+              {supabaseError && (
+                <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '6px', color: 'var(--color-red)', fontSize: '0.8rem' }}>
+                  <strong>Error:</strong> {supabaseError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <span className="form-label text-xs">Supabase Project Endpoint</span>
+                <input type="text" readOnly className="input-text text-sm" style={{ backgroundColor: 'var(--color-paper-darker)', color: 'var(--color-ink-muted)', cursor: 'default' }} value="https://hqtpxaeuhsovwhevztzi.supabase.co" />
+              </div>
+
+              {/* SQL script schema DDL setup */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className="form-label text-xs">Table Schema Setup script (DDL)</span>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.15rem 0.5rem', fontSize: '0.7rem' }} onClick={() => { navigator.clipboard.writeText(sqlScript); alert("Copied SQL Schema!"); }}>Copy SQL</button>
+                </div>
+                <pre style={{ background: '#1e1e1e', color: '#d4d4d4', padding: '0.75rem', borderRadius: '6px', fontFamily: 'monospace', fontSize: '0.72rem', overflowX: 'auto', maxHeight: '180px', border: '1px solid var(--color-border)' }}>
+                  {sqlScript}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (authLoading) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-spinner" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return renderLoginScreen();
+  }
+
+  if (session.user.email !== 'admink338@gmail.com') {
+    try {
+      return renderCandidateDashboard();
+    } catch (err) {
+      console.error("CRASH IN CANDIDATE DASHBOARD:", err);
+      return (
+        <div style={{ padding: '2rem', background: '#fff', color: '#f00', overflow: 'auto', height: '100vh', fontFamily: 'monospace' }}>
+          <h2>Candidate Dashboard Rendering Error:</h2>
+          <pre>{err.stack || err.message || err.toString()}</pre>
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="app-container">
+      {renderLeftSidebar()}
+      <div className="main-workspace">
+        {renderTopHeader()}
+        <div className="workspace-content">
+          {activeSidebarTab === 'jobs' && renderJobsView()}
+          {activeSidebarTab === 'candidates' && renderCandidatesView()}
+          {activeSidebarTab === 'careers' && renderCareersView()}
+          {activeSidebarTab === 'templates' && renderTemplatesView()}
+          {activeSidebarTab === 'settings' && renderSettingsView()}
+        </div>
+      </div>
 
       {renderProfileDrawer()}
+      {renderAIAssistant()}
+      {renderCandidateAuthModal()}
       {renderCareersPreviewModal()}
       {renderCreateJobModal()}
       {renderSupabaseModal()}
