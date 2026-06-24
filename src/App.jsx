@@ -1434,36 +1434,28 @@ Requirements:
         bodyParams.code_verifier = codeVerifier.trim();
       }
 
-      // Build Basic Auth header (RFC 6749 standard - LinkedIn supports this)
-      const basicCreds = btoa(clientId + ':' + clientSecret);
-      console.log('Attempting token exchange with Basic Auth...');
+      // Call our own Vercel serverless function to exchange the code server-side.
+      // This avoids CORS issues since LinkedIn's token endpoint blocks browser requests.
+      const apiBase = window.location.origin;
+      console.log('Calling /api/linkedin-token at:', apiBase);
 
-      // Try with Basic Auth header first (standard OAuth 2.0 method)
-      let response = await fetch('https://corsproxy.io/?' + tokenUrl, {
+      const response = await fetch(apiBase + '/api/linkedin-token', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + basicCreds
-        },
-        body: new URLSearchParams(bodyParams).toString()
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: code,
+          redirect_uri: redirectUri,
+          client_id: clientId,
+          client_secret: clientSecret,
+          ...(codeVerifier ? { code_verifier: codeVerifier } : {})
+        })
       });
 
-      // Fallback: retry without Basic Auth header if that fails
       if (!response.ok) {
-        const errText1 = await response.text();
-        console.warn('Basic Auth attempt failed (' + response.status + '): ' + errText1 + '. Retrying without Basic Auth...');
-        localStorage.setItem('rp_debug_basic_auth_err', 'HTTP ' + response.status + ': ' + errText1);
-        response = await fetch('https://corsproxy.io/?' + tokenUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams(bodyParams).toString()
-        });
-      }
-
-      if (!response.ok) {
-        const errText = await response.text();
-        localStorage.setItem('rp_debug_token_err', 'HTTP ' + response.status + ': ' + errText);
-        throw new Error('Token exchange failed (HTTP ' + response.status + '): ' + errText);
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData.error_description || errData.error || ('HTTP ' + response.status);
+        localStorage.setItem('rp_debug_token_err', JSON.stringify(errData));
+        throw new Error('Token exchange failed: ' + errMsg);
       }
       const data = await response.json();
       const accessToken = data.access_token;
@@ -1492,10 +1484,10 @@ Requirements:
 
       setActiveSidebarTab('linkedin');
       setLinkedinActiveTab('settings');
-      alert("🎉 Successfully authenticated and connected your live LinkedIn account!");
+      alert('Successfully authenticated and connected your live LinkedIn account!');
     } catch (err) {
       console.error("LinkedIn OAuth Exchange Error:", err);
-      alert('LinkedIn Connection Failed: ' + err.message + '\n\nTroubleshooting:\n 1. Ensure your LinkedIn app has the Share on LinkedIn or Sign In with LinkedIn product enabled.\n 2. Verify Client ID and Secret are exactly correct in Settings.\n 3. Make sure the redirect URI (http://localhost:5175/) is registered in LinkedIn Developer Portal.\n 4. Re-click Authorize Account to get a fresh authorization code.');
+      alert('LinkedIn Connection Failed: ' + err.message + '\n\nTroubleshooting:\n 1. Ensure your LinkedIn app has the Share on LinkedIn or Sign In with LinkedIn product enabled.\n 2. Verify Client ID and Secret are exactly correct in Settings.\n 3. Make sure redirect URI (' + window.location.origin + '/) is in LinkedIn Developer Portal Authorized Redirect URLs.\n 4. Re-click Authorize Account to get a fresh authorization code.');
     } finally {
       setIsPostingToLinkedIn(false);
     }
