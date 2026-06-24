@@ -6,7 +6,14 @@ export default defineConfig({
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   server: {
     port: 5173,
-    host: true
+    host: true,
+    proxy: {
+      '/linkedin-api': {
+        target: 'https://api.linkedin.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/linkedin-api/, '')
+      }
+    }
   }
 });
 

@@ -5004,3 +5004,113 @@ mark.highlight-matched {
   text-decoration: underline;
   padding: 0;
 }
+
+/* ==================================================== */
+/*                LINKEDIN PORTAL STYLES                */
+/* ==================================================== */
+
+.linkedin-portal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 0.5rem;
+}
+
+.linkedin-tab-bar {
+  display: flex;
+  gap: 0.8rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1px;
+  margin-bottom: 1rem;
+}
+
+.linkedin-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0.8rem 1.2rem;
+  font-size: 0.9rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-smooth);
+}
+
+.linkedin-tab-btn:hover {
+  color: var(--color-ink);
+  background-color: var(--color-ink-tint);
+}
+
+.linkedin-tab-btn.active {
+  color: var(--color-terracotta);
+  border-bottom-color: var(--color-terracotta);
+}
+
+/* Post preview styling */
+.linkedin-feed-preview {
+  transition: var(--transition-smooth);
+}
+
+.linkedin-feed-preview:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.preview-job-attachment {
+  transition: var(--transition-smooth);
+  border: 1px solid var(--color-border);
+}
+
+.preview-job-attachment:hover {
+  background-color: var(--color-paper-darker);
+  border-color: var(--color-border-hover);
+}
+
+/* Job cards grid */
+.linkedin-search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.linkedin-job-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: var(--transition-smooth);
+}
+
+.linkedin-job-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-terracotta);
+}
+
+/* Integration settings and badges */
+.integration-status-banner {
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-smooth);
+}
+
+.mode-label {
+  transition: var(--transition-smooth);
+}
+
+.mode-label:hover {
+  border-color: var(--color-border-hover) !important;
+}
+
+/* Mode toggles and inputs */
+.linkedin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Animation utilities for the portal */
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

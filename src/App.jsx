@@ -4,7 +4,8 @@ import {
   Trash2, Eye, EyeOff, CheckCircle, RefreshCw, AlertTriangle, ChevronDown, ChevronUp,
   Mail, Send, X, Sun, Moon, Briefcase, Globe, Users, Target, TrendingUp, Zap, DollarSign,
   LogOut, Lock, LayoutDashboard, User, Bookmark, Star, ClipboardList, Award, Calendar,
-  FileCheck, Folder, MessageSquare, Bell, Bot, FolderOpen, ChevronLeft, ChevronRight, BookOpen, Search
+  FileCheck, Folder, MessageSquare, Bell, Bot, FolderOpen, ChevronLeft, ChevronRight, BookOpen, Search,
+  Linkedin, Share2, ExternalLink, BarChart2, Download
 } from 'lucide-react';
 
 
@@ -1224,6 +1225,337 @@ Requirements:
   const [careersTheme, setCareersTheme] = useState('indigo');
   const [careersFont, setCareersFont] = useState('sans');
   const [activeSidebarTab, setActiveSidebarTab] = useState('candidates');
+
+  // LinkedIn Portal States
+  const [linkedinActiveTab, setLinkedinActiveTab] = useState('post'); // 'post' | 'search' | 'settings'
+  const [linkedInConnected, setLinkedInConnected] = useState(() => {
+    return localStorage.getItem('rp_linkedin_connected') === 'true';
+  });
+  const [linkedInMode, setLinkedInMode] = useState(() => {
+    return localStorage.getItem('rp_linkedin_mode') || 'sandbox'; // 'sandbox' | 'live'
+  });
+  const [linkedInClientId, setLinkedInClientId] = useState(() => {
+    return localStorage.getItem('rp_linkedin_client_id') || '';
+  });
+  const [linkedInClientSecret, setLinkedInClientSecret] = useState(() => {
+    return localStorage.getItem('rp_linkedin_client_secret') || '';
+  });
+  const [linkedInRedirectUri, setLinkedInRedirectUri] = useState(() => {
+    return localStorage.getItem('rp_linkedin_redirect_uri') || window.location.origin + '/';
+  });
+  const [linkedInProfile, setLinkedInProfile] = useState(() => {
+    const saved = localStorage.getItem('rp_linkedin_profile');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  // LinkedIn Posting states
+  const [selectedJobForLinkedIn, setSelectedJobForLinkedIn] = useState('job-1');
+  const [linkedInPostType, setLinkedInPostType] = useState('member'); // 'member' | 'company'
+  const [linkedInCompanyId, setLinkedInCompanyId] = useState(() => {
+    return localStorage.getItem('rp_linkedin_company_id') || '';
+  });
+  const [linkedInShareText, setLinkedInShareText] = useState('');
+  const [isPostingToLinkedIn, setIsPostingToLinkedIn] = useState(false);
+  const [linkedInPostSuccess, setLinkedInPostSuccess] = useState(false);
+  const [linkedInShareUrl, setLinkedInShareUrl] = useState('');
+  
+  // LinkedIn Posting History
+  const [linkedInPostHistory, setLinkedInPostHistory] = useState(() => {
+    const saved = localStorage.getItem('rp_linkedin_post_history');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'li-post-1',
+        jobId: 'job-1',
+        jobTitle: 'Senior Frontend Engineer (React)',
+        postType: 'member',
+        shareText: "We're hiring: Senior Frontend Engineer (React)! 🚀\n\nMust-haves:\n• React\n• TypeScript\n• 5+ years experience\n• Tailwind CSS\n• Git\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniorfrontendengineerreact",
+        postedAt: '2026-06-20 11:30 AM',
+        status: 'Live',
+        views: 245,
+        clicks: 34,
+        applies: 8,
+        shareUrl: 'https://www.linkedin.com/feed/update/urn:li:share:7123984712039841'
+      },
+      {
+        id: 'li-post-2',
+        jobId: 'job-2',
+        jobTitle: 'Senior Data Scientist (Python / AI)',
+        postType: 'company',
+        shareText: "We're hiring: Senior Data Scientist (Python / AI)! 🚀\n\nMust-haves:\n• Python\n• PyTorch\n• 3+ years AI/ML experience\n• SQL\n• LLMs\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniordatascientistpythonai",
+        postedAt: '2026-06-18 09:15 AM',
+        status: 'Live',
+        views: 412,
+        clicks: 89,
+        applies: 14,
+        shareUrl: 'https://www.linkedin.com/feed/update/urn:li:share:7123984712039842'
+      }
+    ];
+  });
+
+  // LinkedIn Search States
+  const [linkedInSearchQuery, setLinkedInSearchQuery] = useState('React Developer');
+  const [linkedInSearchLocation, setLinkedInSearchLocation] = useState('Remote');
+  const [linkedInSearchJobType, setLinkedInSearchJobType] = useState('all'); // 'all' | 'full-time' | 'part-time' | 'contract' | 'internship'
+  const [linkedInSearchExperience, setLinkedInSearchExperience] = useState('all'); // 'all' | 'entry' | 'mid-senior' | 'director'
+  const [isSearchingLinkedIn, setIsSearchingLinkedIn] = useState(false);
+  const [linkedInSearchHasSearched, setLinkedInSearchHasSearched] = useState(false);
+  const [linkedInSearchResults, setLinkedInSearchResults] = useState([]);
+  const [selectedSearchResult, setSelectedSearchResult] = useState(null);
+
+  // Simulated OAuth screen state
+  const [isLinkedInAuthOpen, setIsLinkedInAuthOpen] = useState(false);
+  const [authStep, setAuthStep] = useState('login'); // 'login' | 'consent' | 'processing'
+  const [authEmail, setAuthEmail] = useState('admink338@gmail.com');
+  const [authPassword, setAuthPassword] = useState('••••••••');
+
+  const [linkedInAccessToken, setLinkedInAccessToken] = useState(() => {
+    return localStorage.getItem('rp_linkedin_access_token') || '';
+  });
+
+  // PKCE Helper utilities for secure client-side LinkedIn OAuth
+  const generateRandomString = (length) => {
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    let text = '';
+    for (let i = 0; i < length; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  };
+
+  const sha256 = async (plain) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(plain);
+    return window.crypto.subtle.digest('SHA-256', data);
+  };
+
+  const base64urlencode = (a) => {
+    let str = "";
+    const bytes = new Uint8Array(a);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      str += String.fromCharCode(bytes[i]);
+    }
+    return btoa(str)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+  };
+
+  const generateCodeChallenge = async (verifier) => {
+    const hashed = await sha256(verifier);
+    return base64urlencode(hashed);
+  };
+
+  const fetchLinkedInProfileDetails = async (token) => {
+    // Try OpenID Connect /v2/userinfo first, as it is standard for modern apps
+    try {
+      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/userinfo', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log("LinkedIn userinfo response:", data);
+        localStorage.setItem('rp_debug_userinfo', JSON.stringify(data));
+        localStorage.removeItem('rp_debug_userinfo_err');
+        
+        const id = data.sub || data.id;
+        const name = data.name || `${data.given_name || ''} ${data.family_name || ''}`.trim() || 'Recruiter';
+        return { id, name };
+      } else {
+        const errText = await res.text();
+        console.error("LinkedIn userinfo error:", res.status, errText);
+        localStorage.setItem('rp_debug_userinfo_err', `Status ${res.status}: ${errText}`);
+      }
+    } catch (e) {
+      console.warn("Fetch /v2/userinfo details failed, trying /v2/me", e);
+      localStorage.setItem('rp_debug_userinfo_exc', e.message);
+    }
+
+    // Fallback to /v2/me
+    try {
+      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Restli-Protocol-Version': '2.0.0'
+        }
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("LinkedIn /v2/me error:", res.status, errText);
+        localStorage.setItem('rp_debug_me_err', `Status ${res.status}: ${errText}`);
+        throw new Error(`[HTTP ${res.status}] ${res.statusText || 'Error'}: ${errText}`);
+      }
+      const data = await res.json();
+      console.log("LinkedIn /v2/me response:", data);
+      localStorage.setItem('rp_debug_me', JSON.stringify(data));
+      localStorage.removeItem('rp_debug_me_err');
+      
+      const id = data.id;
+      const firstName = data.localizedFirstName || (data.firstName && data.firstName.localized && Object.values(data.firstName.localized)[0]) || '';
+      const lastName = data.localizedLastName || (data.lastName && data.lastName.localized && Object.values(data.lastName.localized)[0]) || '';
+      const name = `${firstName} ${lastName}`.trim() || 'Recruiter';
+      return { id, name };
+    } catch (e) {
+      localStorage.setItem('rp_debug_me_exc', e.message);
+      if (e.message.includes('Failed to fetch')) {
+        throw new Error("Network error (Failed to fetch) while fetching profile. Please check your connection.");
+      }
+      throw e;
+    }
+  };
+
+  const exchangeLinkedInCodeForToken = async (code) => {
+    setIsPostingToLinkedIn(true);
+    try {
+      const clientId = (localStorage.getItem('rp_linkedin_client_id') || linkedInClientId || '').trim();
+      const clientSecret = (localStorage.getItem('rp_linkedin_client_secret') || linkedInClientSecret || '').trim();
+      const redirectUri = (localStorage.getItem('rp_linkedin_redirect_uri') || linkedInRedirectUri || '').trim();
+      const codeVerifier = localStorage.getItem('rp_linkedin_code_verifier');
+
+      if (!clientId || !clientSecret) {
+        throw new Error("Client ID and Client Secret must be configured in settings to complete authorization.");
+      }
+
+      // Exchange authorization code for access token via CORS proxy
+      const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
+      const bodyParams = {
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret
+      };
+
+      // Add code_verifier if it was generated during authorization redirect
+      if (codeVerifier) {
+        bodyParams.code_verifier = codeVerifier.trim();
+      }
+
+      // Build Basic Auth header (RFC 6749 standard - LinkedIn supports this)
+      const basicCreds = btoa(clientId + ':' + clientSecret);
+      console.log('Attempting token exchange with Basic Auth...');
+
+      // Try with Basic Auth header first (standard OAuth 2.0 method)
+      let response = await fetch('https://corsproxy.io/?' + tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + basicCreds
+        },
+        body: new URLSearchParams(bodyParams).toString()
+      });
+
+      // Fallback: retry without Basic Auth header if that fails
+      if (!response.ok) {
+        const errText1 = await response.text();
+        console.warn('Basic Auth attempt failed (' + response.status + '): ' + errText1 + '. Retrying without Basic Auth...');
+        localStorage.setItem('rp_debug_basic_auth_err', 'HTTP ' + response.status + ': ' + errText1);
+        response = await fetch('https://corsproxy.io/?' + tokenUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams(bodyParams).toString()
+        });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        localStorage.setItem('rp_debug_token_err', 'HTTP ' + response.status + ': ' + errText);
+        throw new Error('Token exchange failed (HTTP ' + response.status + '): ' + errText);
+      }
+      const data = await response.json();
+      const accessToken = data.access_token;
+      if (!accessToken) {
+        throw new Error("No access_token returned in the response");
+      }
+
+      setLinkedInAccessToken(accessToken);
+      localStorage.setItem('rp_linkedin_access_token', accessToken);
+
+      // Fetch user profile details
+      const profileData = await fetchLinkedInProfileDetails(accessToken);
+      setLinkedInConnected(true);
+      setLinkedInProfile({
+        name: profileData.name,
+        headline: 'Talent Acquisition Partner (Live API)',
+        avatar: profileData.name.split(' ').map(n => n[0]).join(''),
+        id: profileData.id
+      });
+
+      localStorage.removeItem('rp_linkedin_code_verifier');
+
+      // Clear code query param from browser address bar
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+
+      setActiveSidebarTab('linkedin');
+      setLinkedinActiveTab('settings');
+      alert("🎉 Successfully authenticated and connected your live LinkedIn account!");
+    } catch (err) {
+      console.error("LinkedIn OAuth Exchange Error:", err);
+      alert('LinkedIn Connection Failed: ' + err.message + '\n\nTroubleshooting:\n 1. Ensure your LinkedIn app has the Share on LinkedIn or Sign In with LinkedIn product enabled.\n 2. Verify Client ID and Secret are exactly correct in Settings.\n 3. Make sure the redirect URI (http://localhost:5175/) is registered in LinkedIn Developer Portal.\n 4. Re-click Authorize Account to get a fresh authorization code.');
+    } finally {
+      setIsPostingToLinkedIn(false);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_access_token', linkedInAccessToken);
+  }, [linkedInAccessToken]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const mode = localStorage.getItem('rp_linkedin_mode') || linkedInMode;
+    if (code && mode === 'live') {
+      exchangeLinkedInCodeForToken(code);
+    }
+  }, []);
+
+  // Save credentials and settings changes
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_connected', linkedInConnected ? 'true' : 'false');
+  }, [linkedInConnected]);
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_mode', linkedInMode);
+  }, [linkedInMode]);
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_client_id', linkedInClientId);
+  }, [linkedInClientId]);
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_client_secret', linkedInClientSecret);
+  }, [linkedInClientSecret]);
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_redirect_uri', linkedInRedirectUri);
+  }, [linkedInRedirectUri]);
+
+  useEffect(() => {
+    if (linkedInProfile) {
+      localStorage.setItem('rp_linkedin_profile', JSON.stringify(linkedInProfile));
+    } else {
+      localStorage.removeItem('rp_linkedin_profile');
+    }
+  }, [linkedInProfile]);
+
+  useEffect(() => {
+    localStorage.setItem('rp_linkedin_company_id', linkedInCompanyId);
+  }, [linkedInCompanyId]);
+
+  // Update LinkedIn Share Text when selected job changes
+  useEffect(() => {
+    const job = jobs.find(j => j.id === selectedJobForLinkedIn);
+    if (job) {
+      setLinkedInShareText(`We're hiring: ${job.title}! 🚀\n\nMust-haves:\n${job.mustHaves ? job.mustHaves.split(',').map(s => `• ${s.trim()}`).join('\n') : ''}\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #${job.title.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
+    } else {
+      setLinkedInShareText('');
+    }
+  }, [selectedJobForLinkedIn, jobs]);
 
   const tempSubjectRef = useRef(null);
   const tempBodyRef = useRef(null);
@@ -5921,6 +6253,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           {[
             { id: 'jobs', label: 'Jobs Dashboard', icon: <Briefcase size={18} /> },
             { id: 'candidates', label: 'Candidates Manager', icon: <Users size={18} /> },
+            { id: 'linkedin', label: 'LinkedIn Portal', icon: <Linkedin size={18} /> },
             { id: 'careers', label: 'Careers Portal', icon: <Globe size={18} /> },
             { id: 'templates', label: 'Email Center', icon: <Mail size={18} /> },
             { id: 'settings', label: 'System Settings', icon: <Settings size={18} /> }
@@ -5971,6 +6304,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
   const renderTopHeader = () => {
     let title = "Candidates Manager";
     if (activeSidebarTab === 'jobs') title = "Jobs Dashboard";
+    else if (activeSidebarTab === 'linkedin') title = "LinkedIn Portal";
     else if (activeSidebarTab === 'careers') title = "Careers Page Builder";
     else if (activeSidebarTab === 'templates') title = "Email Templates & Logs";
     else if (activeSidebarTab === 'settings') title = "System Settings & Integrations";
@@ -7149,7 +7483,1483 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         <div className="auth-loading-spinner" />
       </div>
     );
-  }
+  }  // --- LINKEDIN PORTAL INTEGRATION CODE ---
+  const handleImportLinkedInJob = (job) => {
+    const isAlreadyImported = jobs.some(j => j.title.toLowerCase() === job.title.toLowerCase());
+    if (isAlreadyImported) {
+      alert("A job with this title is already imported in the ATS!");
+      return;
+    }
+    const newJobId = `job-imported-${Date.now()}`;
+    const newJob = {
+      id: newJobId,
+      title: job.title,
+      description: job.description || `We are looking for a ${job.title} at ${job.company}. Location: ${job.location}`,
+      mustHaves: job.requirements || 'React, JavaScript, CSS'
+    };
+
+    setJobs(prev => [...prev, newJob]);
+    setActiveJobId(newJobId);
+    setJobTitle(newJob.title);
+    setJobDescription(newJob.description);
+    setMustHaves(newJob.mustHaves);
+    
+    alert(`🎉 Successfully imported "${job.title}" from LinkedIn into your Jobs Dashboard!`);
+    setSelectedSearchResult(null);
+    setActiveSidebarTab('jobs'); // Redirect to Jobs Dashboard
+  };
+
+  const fetchLinkedInProfileId = async (token) => {
+    try {
+      const profile = await fetchLinkedInProfileDetails(token);
+      return profile.id;
+    } catch (e) {
+      throw e;
+    }
+  };
+
+  const publishToLinkedInFeed = async (token, personId, text) => {
+    try {
+      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/ugcShares', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0'
+        },
+        body: JSON.stringify({
+          "author": `urn:li:person:${personId}`,
+          "lifecycleState": "PUBLISHED",
+          "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+              "shareCommentary": {
+                "text": text
+              },
+              "shareMediaCategory": "NONE"
+            }
+          },
+          "visibility": {
+            "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+          }
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`[HTTP ${res.status}] ${res.statusText || 'Error'}: ${errText}`);
+      }
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      if (e.message.includes('Failed to fetch')) {
+        throw new Error("Network error (Failed to fetch). Please make sure you have stopped and restarted your 'npm run dev' terminal server after the vite.config.js update to load the proxy settings.");
+      }
+      throw e;
+    }
+  };
+
+  const handleAuthorizeLinkedIn = async () => {
+    if (linkedInMode === 'live') {
+      if (!linkedInClientId.trim() || !linkedInClientSecret.trim()) {
+        alert("Please enter both Client ID and Client Secret under Settings first!");
+        return;
+      }
+      
+      // Save credentials in localStorage
+      localStorage.setItem('rp_linkedin_client_id', linkedInClientId.trim());
+      localStorage.setItem('rp_linkedin_client_secret', linkedInClientSecret.trim());
+      localStorage.setItem('rp_linkedin_redirect_uri', linkedInRedirectUri.trim());
+      localStorage.setItem('rp_linkedin_mode', 'live');
+
+      // Generate PKCE code verifier and challenge
+      const codeVerifier = generateRandomString(64);
+      localStorage.setItem('rp_linkedin_code_verifier', codeVerifier);
+      
+      let challenge = '';
+      try {
+        challenge = await generateCodeChallenge(codeVerifier);
+      } catch (err) {
+        console.error("PKCE Challenge generation failed:", err);
+        alert("PKCE security generation failed. Reverting to basic OAuth.");
+      }
+
+      const scope = encodeURIComponent('w_member_social openid profile email');
+      let authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedInClientId.trim()}&redirect_uri=${encodeURIComponent(linkedInRedirectUri.trim())}&scope=${scope}&state=rp_${Date.now()}`;
+      
+      if (challenge) {
+        authUrl += `&code_challenge=${challenge}&code_challenge_method=S256`;
+      }
+      
+      window.location.href = authUrl;
+    } else {
+      setIsLinkedInAuthOpen(true);
+    }
+  };
+
+  const handlePostToLinkedIn = async () => {
+    const isReady = linkedInMode === 'live' ? linkedInAccessToken.trim().length > 0 : linkedInConnected;
+    if (!isReady) {
+      alert(linkedInMode === 'live' 
+        ? "Please enter your LinkedIn Access Token under Settings first!" 
+        : "Please connect your LinkedIn account first under Settings!");
+      setLinkedinActiveTab('settings');
+      return;
+    }
+    
+    const activeJob = jobs.find(j => j.id === selectedJobForLinkedIn);
+    if (!activeJob) {
+      alert("Please select a valid job to post.");
+      return;
+    }
+    
+    if (!linkedInShareText.trim()) {
+      alert("Please provide some text to share.");
+      return;
+    }
+
+    if (linkedInPostType === 'company' && !linkedInCompanyId.trim()) {
+      alert("Please provide your LinkedIn Company ID to post on behalf of the company.");
+      return;
+    }
+
+    setIsPostingToLinkedIn(true);
+    setLinkedInPostSuccess(false);
+
+    if (linkedInMode === 'sandbox') {
+      // Simulated API call latency
+      setTimeout(() => {
+        const newPostId = `li-post-${Date.now()}`;
+        const newShareUrl = `https://www.linkedin.com/feed/update/urn:li:share:${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`;
+        
+        const newPost = {
+          id: newPostId,
+          jobId: activeJob.id,
+          jobTitle: activeJob.title,
+          postType: linkedInPostType,
+          shareText: linkedInShareText,
+          postedAt: new Date().toLocaleString(),
+          status: 'Live',
+          views: 0,
+          clicks: 0,
+          applies: 0,
+          shareUrl: newShareUrl
+        };
+
+        setLinkedInPostHistory(prev => {
+          const updated = [newPost, ...prev];
+          localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+          return updated;
+        });
+
+        setLinkedInShareUrl(newShareUrl);
+        setLinkedInPostSuccess(true);
+        setIsPostingToLinkedIn(false);
+
+        // Copy formatted recruiting text to user's clipboard
+        navigator.clipboard.writeText(linkedInShareText)
+          .then(() => {
+            alert(`🎉 Simulated Publishing Complete!\n\n📋 The formatted job posting announcement has been copied to your clipboard.\n\nWe are now opening LinkedIn.com in a new tab. Simply paste (Ctrl+V) the text into the post editor to publish it live on your feed!`);
+            window.open('https://www.linkedin.com/feed/', '_blank');
+          })
+          .catch((err) => {
+            console.error("Clipboard copy failed: ", err);
+            alert(`🎉 Simulated Publishing Complete!\n\nWe are opening LinkedIn.com in a new tab to create your post. Please copy the text from the preview card manually and paste it into LinkedIn.`);
+            window.open('https://www.linkedin.com/feed/', '_blank');
+          });
+      }, 2000);
+    } else {
+      // Live API Mode
+      if (!linkedInAccessToken.trim()) {
+        alert("Please enter a valid LinkedIn Access Token in the Settings tab first.");
+        setLinkedinActiveTab('settings');
+        setIsPostingToLinkedIn(false);
+        return;
+      }
+
+      try {
+        // Step 1: Fetch profile ID
+        const personId = await fetchLinkedInProfileId(linkedInAccessToken);
+        
+        // Step 2: Publish share
+        const result = await publishToLinkedInFeed(linkedInAccessToken, personId, linkedInShareText);
+        
+        const newPostId = result.id || `li-post-live-${Date.now()}`;
+        // LinkedIn URN formatting for url
+        const urnPart = newPostId.includes(':') ? newPostId.split(':').pop() : newPostId;
+        const newShareUrl = `https://www.linkedin.com/feed/update/urn:li:share:${urnPart}`;
+
+        const newPost = {
+          id: newPostId,
+          jobId: activeJob.id,
+          jobTitle: activeJob.title,
+          postType: linkedInPostType,
+          shareText: linkedInShareText,
+          postedAt: new Date().toLocaleString(),
+          status: 'Live',
+          views: 0,
+          clicks: 0,
+          applies: 0,
+          shareUrl: newShareUrl
+        };
+
+        setLinkedInPostHistory(prev => {
+          const updated = [newPost, ...prev];
+          localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+          return updated;
+        });
+
+        setLinkedInShareUrl(newShareUrl);
+        setLinkedInPostSuccess(true);
+        
+        alert("🎉 Successfully posted job announcement live to your LinkedIn profile feed!");
+      } catch (err) {
+        console.error("LinkedIn Live Post Error: ", err);
+        alert(`❌ Failed to publish to LinkedIn: ${err.message}\n\nMake sure your Access Token has the correct scopes ('w_member_social') and has not expired.`);
+      } finally {
+        setIsPostingToLinkedIn(false);
+      }
+    }
+  };
+
+  const handleLinkedInJobSearch = (e) => {
+    if (e) e.preventDefault();
+    setIsSearchingLinkedIn(true);
+    setLinkedInSearchHasSearched(true);
+    
+    setTimeout(() => {
+      const query = linkedInSearchQuery.toLowerCase();
+      const loc = linkedInSearchLocation.toLowerCase();
+      
+      const allMockJobs = [
+        {
+          id: 'li-res-1',
+          title: 'Senior Frontend Engineer (React/Next)',
+          company: 'Vercel',
+          logoInitials: 'VC',
+          logoBg: '#000000',
+          location: 'Remote, US',
+          salary: '$145,000 - $175,000 / yr',
+          posted: '2 days ago',
+          type: 'full-time',
+          experience: 'mid-senior',
+          description: `Vercel is looking for a Senior Frontend Engineer to work on our core dashboard experience.\n\nRole & Responsibilities:\n• Lead architectural decisions for our React and Next.js applications.\n• Collaborate with designers and product managers to create stellar UI/UX.\n• Optimize web application performance for globally distributed users.\n\nRequirements:\n• 5+ years of experience with React, Next.js, and TypeScript.\n• Deep understanding of Webpack, Turbopack, and build systems.\n• Strong eye for detail, design, and web animations.\n• Experience with Tailwind CSS and CSS modules.`,
+          requirements: 'React, Next.js, TypeScript, Tailwind CSS, Web Performance'
+        },
+        {
+          id: 'li-res-2',
+          title: 'React & React Native Lead',
+          company: 'Airbnb',
+          logoInitials: 'AB',
+          logoBg: '#FF5A5F',
+          location: 'Remote, Worldwide',
+          salary: '$160,000 - $200,000 / yr',
+          posted: '3 days ago',
+          type: 'full-time',
+          experience: 'mid-senior',
+          description: `Join Airbnb as a React/React Native Lead. You will build high-quality mobile and web experiences for guests and hosts worldwide.\n\nKey Responsibilities:\n• Architect cross-platform components in React Native and React.\n• Drive performance improvements and offline-first functionalities.\n• Lead a squad of 6 engineers and run code reviews.\n\nQualifications:\n• 7+ years of experience in JavaScript frameworks, with 4+ years dedicated to React and React Native.\n• Expert at state management (Redux, Zustand, Context API).\n• Strong communicator with track record of leading product initiatives.`,
+          requirements: 'React Native, React, Zustand, State Management, Mobile Dev'
+        },
+        {
+          id: 'li-res-3',
+          title: 'Staff React Developer (Core UI)',
+          company: 'Stripe',
+          logoInitials: 'SP',
+          logoBg: '#635BFF',
+          location: 'San Francisco, CA',
+          salary: '$190,000 - $230,000 / yr',
+          posted: '1 week ago',
+          type: 'full-time',
+          experience: 'director',
+          description: `Stripe's Core UI team is looking for a Staff Developer to help build the components and design systems powering our dashboard.\n\nWhat You Will Do:\n• Drive the engineering standard of Stripe's web components.\n• Work directly with the Design Systems team to create highly accessible UI.\n• Mentor frontend engineers across the billing, checkout, and connect teams.\n\nRequirements:\n• Expert knowledge of raw browser APIs, rendering engine, accessibility (WCAG).\n• Passion for building reusable library code.\n• 8+ years of production experience.`,
+          requirements: 'React, Design Systems, Accessibility (WCAG), Vanilla JS, Webpack'
+        },
+        {
+          id: 'li-res-4',
+          title: 'Frontend Engineer (React) - Internship',
+          company: 'GitHub',
+          logoInitials: 'GH',
+          logoBg: '#24292F',
+          location: 'San Francisco, CA (Hybrid)',
+          salary: '$45 - $60 / hr',
+          posted: '1 day ago',
+          type: 'internship',
+          experience: 'entry',
+          description: `GitHub is looking for a Frontend Intern for Fall 2026. You will work on GitHub Copilot dashboard elements and developer community pages.\n\nResponsibilities:\n• Implement new features using React and primer components.\n• Fix UI bugs and optimize page layouts.\n• Learn and apply professional engineering standards under mentorship.\n\nRequirements:\n• Enrolled in a CS or equivalent degree, or boot camp graduate.\n• Proficient in React, JavaScript, and HTML/CSS.\n• Experience with Git and version control.`,
+          requirements: 'React, CSS, Git, HTML, JavaScript'
+        },
+        {
+          id: 'li-res-5',
+          title: 'Lead Frontend UI Developer',
+          company: 'Netflix',
+          logoInitials: 'NF',
+          logoBg: '#E50914',
+          location: 'Los Gatos, CA',
+          salary: '$220,000 - $310,000 / yr',
+          posted: '4 days ago',
+          type: 'full-time',
+          experience: 'mid-senior',
+          description: `We are looking for a Lead UI Developer for the Netflix TV interface team. You will craft the highly-scalable Web-app rendering on thousands of Smart TV devices.\n\nWhat You Will Do:\n• Lead performance-critical UI rendering improvements.\n• Build fluid 60fps animations on restricted memory environments.\n• Write clean, testable React code.\n\nRequirements:\n• 6+ years in frontend development.\n• Deep React expertise, canvas/WebGL experience is a huge plus.\n• Highly skilled in UI animations and CSS transitions.`,
+          requirements: 'React, WebGL, Canvas, Performance Tuning, UI Animations'
+        },
+        {
+          id: 'li-res-6',
+          title: 'Contract Full Stack Developer (Node / React)',
+          company: 'Figma',
+          logoInitials: 'FG',
+          logoBg: '#F24E1E',
+          location: 'Remote',
+          salary: '$90 - $120 / hr',
+          posted: '5 days ago',
+          type: 'contract',
+          experience: 'mid-senior',
+          description: `Figma is hiring a Full Stack contractor to help build a custom billing dashboard.\n\nDetails:\n• 6-month contract with possibility of extension.\n• Stack: React, TypeScript, Node.js, PostgreSQL.\n• Focus on data visualization, charts, and invoice exports.\n\nQualifications:\n• 4+ years of full-stack engineering.\n• Experience with Chart.js, D3.js or similar libraries.\n• Self-starter able to deliver end-to-end features.`,
+          requirements: 'React, Node.js, TypeScript, PostgreSQL, D3.js'
+        },
+        {
+          id: 'li-res-7',
+          title: 'Junior Data Scientist',
+          company: 'Meta',
+          logoInitials: 'ME',
+          logoBg: '#0668E1',
+          location: 'Menlo Park, CA',
+          salary: '$110,000 - $135,000 / yr',
+          posted: '1 day ago',
+          type: 'full-time',
+          experience: 'entry',
+          description: `Join Meta's Product Analytics team as a Junior Data Scientist. You will analyze user engagement patterns for Meta Quest and VR products.\n\nRequirements:\n• Proficiency in Python/R and SQL.\n• Background in statistics, experiment design (A/B testing).\n• Good communication skills and business acumen.`,
+          requirements: 'Python, SQL, A/B Testing, Statistics, Excel'
+        },
+        {
+          id: 'li-res-8',
+          title: 'Senior Data Scientist (LLM Safety)',
+          company: 'OpenAI',
+          logoInitials: 'OA',
+          logoBg: '#000000',
+          location: 'San Francisco, CA (Hybrid)',
+          salary: '$240,000 - $330,000 / yr',
+          posted: '6 days ago',
+          type: 'full-time',
+          experience: 'mid-senior',
+          description: `OpenAI is seeking a Senior Data Scientist to lead our safety analysis for next-generation generative models.\n\nKey Responsibilities:\n• Design safety evaluations and metrics for LLM models.\n• Conduct fine-tuning and reinforcement learning studies.\n• Inform safety policy via data-driven studies.\n\nQualifications:\n• 5+ years experience in NLP and deep learning models.\n• Expert in PyTorch and Python.\n• Deep research background.`,
+          requirements: 'Python, PyTorch, LLMs, NLP, Reinforcement Learning'
+        },
+        {
+          id: 'li-res-9',
+          title: 'Technical Product Manager (Payments)',
+          company: 'Shopify',
+          logoInitials: 'SF',
+          logoBg: '#95BF47',
+          location: 'Toronto, Canada',
+          salary: '$130,000 - $160,000 / yr',
+          posted: '5 days ago',
+          type: 'full-time',
+          experience: 'mid-senior',
+          description: `Shopify is seeking a Technical Product Manager to lead our payments integration teams.\n\nKey Responsibilities:\n• Define product roadmap for Shopify Payments core API.\n• Coordinate with credit processors, developers, and compliance teams.\n• Write detailed tech specs and user stories.\n\nQualifications:\n• 4+ years of product management, with 2+ years in Fintech.\n• Basic SQL and coding capabilities to communicate effectively with engineering.`,
+          requirements: 'Product Management, Fintech, Payments, SQL, Agile'
+        }
+      ];
+
+      let filtered = allMockJobs.filter(job => {
+        const matchQuery = !query || 
+          job.title.toLowerCase().includes(query) || 
+          job.company.toLowerCase().includes(query) || 
+          job.requirements.toLowerCase().includes(query);
+          
+        const matchLoc = !loc || job.location.toLowerCase().includes(loc) || (loc === 'remote' && job.location.toLowerCase().includes('remote'));
+        const matchType = linkedInSearchJobType === 'all' || job.type === linkedInSearchJobType;
+        const matchExp = linkedInSearchExperience === 'all' || job.experience === linkedInSearchExperience;
+        
+        return matchQuery && matchLoc && matchType && matchExp;
+      });
+      
+      if (filtered.length === 0) {
+        // Generate dynamic mock jobs matching their query
+        const capitalizedQuery = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        const locations = [linkedInSearchLocation || 'Remote, Global', 'San Francisco, CA', 'New York, NY', 'Bangalore, India'];
+        const companies = ['Meta', 'Google', 'Microsoft', 'Netflix', 'Amazon', 'Vercel', 'Uber'];
+        const colors = ['#0668E1', '#4285F4', '#F25022', '#E50914', '#FF9900', '#000000', '#00A4EF'];
+        
+        filtered = Array.from({ length: 3 }).map((_, i) => {
+          const companyIdx = Math.floor(Math.random() * companies.length);
+          const comp = companies[companyIdx];
+          const logoInitials = comp.substring(0, 2).toUpperCase();
+          const logoBg = colors[companyIdx];
+          const location = locations[i % locations.length];
+          const salary = `$${100 + i * 20},000 - $${130 + i * 30},000 / yr`;
+          const type = linkedInSearchJobType === 'all' ? 'full-time' : linkedInSearchJobType;
+          const experience = linkedInSearchExperience === 'all' ? 'mid-senior' : linkedInSearchExperience;
+          
+          return {
+            id: `li-dynamic-${Date.now()}-${i}`,
+            title: `${capitalizedQuery || 'Software Specialist'} (${experience === 'entry' ? 'Junior' : experience === 'director' ? 'Lead/Director' : 'Senior'})`,
+            company: comp,
+            logoInitials,
+            logoBg,
+            location,
+            salary,
+            posted: 'Just now',
+            type,
+            experience,
+            description: `We are looking for a qualified ${capitalizedQuery || 'Software Specialist'} to join the team at ${comp}.\n\nRequirements:\n• 3+ years experience with key industry frameworks.\n• Strong collaboration skills.\n• Bachelor's degree or equivalent experience in computer science or related field.`,
+            requirements: `${capitalizedQuery || 'Engineering'}, JavaScript, Git`
+          };
+        });
+      }
+      
+      setLinkedInSearchResults(filtered);
+      setIsSearchingLinkedIn(false);
+    }, 1200);
+  };
+
+  const handleSyncMetrics = (postId) => {
+    setLinkedInPostHistory(prev => {
+      const updated = prev.map(p => {
+        if (p.id === postId) {
+          const addedViews = Math.floor(Math.random() * 50) + 10;
+          const addedClicks = Math.floor(addedViews * (Math.random() * 0.3 + 0.05));
+          const addedApplies = Math.floor(addedClicks * (Math.random() * 0.2));
+          return {
+            ...p,
+            views: p.views + addedViews,
+            clicks: p.clicks + addedClicks,
+            applies: p.applies + addedApplies
+          };
+        }
+        return p;
+      });
+      localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleClosePost = (postId) => {
+    setLinkedInPostHistory(prev => {
+      const updated = prev.map(p => {
+        if (p.id === postId) {
+          return { ...p, status: 'Archived' };
+        }
+        return p;
+      });
+      localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const renderLinkedInView = () => {
+    return (
+      <div className="linkedin-portal-panel animate-fade-in">
+        <div className="view-header">
+          <h2>LinkedIn Integration Portal</h2>
+          <p className="subtitle">Publish active ATS jobs directly to LinkedIn feeds and search external listings to import.</p>
+        </div>
+
+        {linkedInMode === 'sandbox' && (
+          <div className="integration-status-banner animate-fade-in" style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            padding: '1rem 1.2rem',
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: 'var(--color-gold-light)',
+            border: '1px solid var(--color-gold)',
+            marginBottom: '1rem',
+            fontSize: '0.85rem',
+            color: 'var(--color-ink-light)'
+          }}>
+            <AlertTriangle size={18} style={{ color: 'var(--color-gold)', flexShrink: 0 }} />
+            <div style={{ flex: 1, lineHeight: '1.4' }}>
+              <strong>Sandbox Mode Active:</strong> Job postings and search results are simulated inside the local ATS database for testing. Clicking <em>"View Post"</em> redirects you to your actual feed dashboard. To connect and publish to a live LinkedIn profile feed, toggle to <strong>Live API Mode</strong> under the <em>Settings</em> tab.
+            </div>
+          </div>
+        )}
+
+        {/* Tab switcher */}
+        <div className="linkedin-tab-bar">
+          <button 
+            type="button"
+            className={`linkedin-tab-btn ${linkedinActiveTab === 'post' ? 'active' : ''}`}
+            onClick={() => setLinkedinActiveTab('post')}
+          >
+            <Share2 size={16} /> Job Posting & Feed Preview
+          </button>
+          <button 
+            type="button"
+            className={`linkedin-tab-btn ${linkedinActiveTab === 'search' ? 'active' : ''}`}
+            onClick={() => setLinkedinActiveTab('search')}
+          >
+            <Search size={16} /> Job Search & Import
+          </button>
+          <button 
+            type="button"
+            className={`linkedin-tab-btn ${linkedinActiveTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setLinkedinActiveTab('settings')}
+          >
+            <Settings size={16} /> Connection & API Settings
+          </button>
+        </div>
+
+        {/* Render Settings Tab */}
+        {linkedinActiveTab === 'settings' && (
+          <div className="linkedin-settings-view">
+            <div className="linkedin-card card">
+              <h3 className="card-title">LinkedIn API Integration Config</h3>
+              
+              <div className="integration-status-banner" style={{
+                display: 'flex', alignItems: 'center', gap: '1rem',
+                padding: '1.2rem', borderRadius: 'var(--radius-md)',
+                backgroundColor: linkedInConnected ? 'var(--color-sage-light)' : 'var(--color-gold-light)',
+                border: `1px solid ${linkedInConnected ? 'var(--color-sage)' : 'var(--color-gold)'}`,
+                marginBottom: '2rem'
+              }}>
+                {linkedInConnected ? <CheckCircle size={24} style={{ color: 'var(--color-sage)' }} /> : <AlertTriangle size={24} style={{ color: 'var(--color-gold)' }} />}
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ color: 'var(--color-ink)', fontSize: '1rem', fontWeight: 'bold' }}>
+                    {linkedInConnected ? 'LinkedIn Account Connected' : 'LinkedIn Authorization Required'}
+                  </h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-light)', marginTop: '0.2rem' }}>
+                    {linkedInConnected 
+                      ? `Authorized as ${linkedInProfile?.name || 'Recruiter'}. Ready to post jobs and search listings.` 
+                      : 'Please authorize with your LinkedIn Credentials to enable live posting feeds.'}
+                  </p>
+                </div>
+                {!linkedInConnected ? (
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={handleAuthorizeLinkedIn}
+                  >
+                    Authorize Account
+                  </button>
+                ) : (
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={() => {
+                      setLinkedInConnected(false);
+                      setLinkedInProfile(null);
+                    }}
+                    style={{ color: 'var(--color-red)', borderColor: 'var(--color-red)' }}
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+
+              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Client ID</label>
+                  <input 
+                    type="text" 
+                    className="input-text" 
+                    placeholder="Enter Client ID from Developer Portal"
+                    value={linkedInClientId}
+                    onChange={(e) => setLinkedInClientId(e.target.value)}
+                    disabled={linkedInConnected}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client Secret</label>
+                  <input 
+                    type="password" 
+                    className="input-text" 
+                    placeholder="Enter Client Secret"
+                    value={linkedInClientSecret}
+                    onChange={(e) => setLinkedInClientSecret(e.target.value)}
+                    disabled={linkedInConnected}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                <label className="form-label">OAuth Redirect URI</label>
+                <input 
+                  type="text" 
+                  className="input-text" 
+                  value={linkedInRedirectUri}
+                  onChange={(e) => setLinkedInRedirectUri(e.target.value)}
+                  disabled={linkedInConnected}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '2rem' }}>
+                <label className="form-label">
+                  LinkedIn Access Token 
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', fontWeight: 'normal', marginLeft: '0.4rem' }}>
+                    (Required for Live API Mode posting)
+                  </span>
+                </label>
+                <input 
+                  type="password" 
+                  className="input-text" 
+                  placeholder="Paste your OAuth Access Token (Bearer token)"
+                  value={linkedInAccessToken}
+                  onChange={(e) => setLinkedInAccessToken(e.target.value)}
+                />
+                <p style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '0.3rem' }}>
+                  Provide a token with <code>w_member_social</code> scope. You can generate one using the LinkedIn OAuth Tools or developer portal.
+                </p>
+              </div>
+
+              <div className="form-group" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Integration Execution Mode</span>
+                  <span className={`badge ${linkedInMode === 'sandbox' ? 'badge-gold' : 'badge-sage'}`} style={{
+                    padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', textTransform: 'uppercase',
+                    backgroundColor: linkedInMode === 'sandbox' ? 'var(--color-gold-light)' : 'var(--color-sage-light)',
+                    color: linkedInMode === 'sandbox' ? 'var(--color-gold)' : 'var(--color-sage)',
+                    border: `1px solid ${linkedInMode === 'sandbox' ? 'var(--color-gold)' : 'var(--color-sage)'}`
+                  }}>
+                    {linkedInMode} mode
+                  </span>
+                </label>
+                
+                <div className="mode-toggle-options" style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem' }}>
+                  <label className="mode-label" style={{
+                    flex: 1, padding: '1rem', border: `1px solid ${linkedInMode === 'sandbox' ? 'var(--color-terracotta)' : 'var(--color-border)'}`,
+                    borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', gap: '0.8rem', alignItems: 'flex-start',
+                    backgroundColor: linkedInMode === 'sandbox' ? 'var(--color-ink-tint)' : 'transparent'
+                  }}>
+                    <input 
+                      type="radio" 
+                      name="linkedinMode" 
+                      checked={linkedInMode === 'sandbox'} 
+                      onChange={() => setLinkedInMode('sandbox')}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem' }}>Sandbox (Simulated)</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
+                        Allows instant testing with realistic mock data, OAuth simulation popup, and analytics metrics without requiring enterprise API credentials.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="mode-label" style={{
+                    flex: 1, padding: '1rem', border: `1px solid ${linkedInMode === 'live' ? 'var(--color-terracotta)' : 'var(--color-border)'}`,
+                    borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', gap: '0.8rem', alignItems: 'flex-start',
+                    backgroundColor: linkedInMode === 'live' ? 'var(--color-ink-tint)' : 'transparent'
+                  }}>
+                    <input 
+                      type="radio" 
+                      name="linkedinMode" 
+                      checked={linkedInMode === 'live'} 
+                      onChange={() => setLinkedInMode('live')}
+                      style={{ marginTop: '0.2rem' }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem' }}>Live API Mode</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
+                        Connect to real LinkedIn API endpoints. Requires verified Developer application credentials and server-side token handlers.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="linkedin-card card" style={{ marginTop: '1.5rem' }}>
+              <h3 className="card-title">Setup Guidelines</h3>
+              <ol style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', fontSize: '0.85rem', color: 'var(--color-ink-light)', marginTop: '1rem' }}>
+                <li>Go to the <a href="https://www.linkedin.com/developers/" target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>LinkedIn Developers Portal</a> and create an application.</li>
+                <li>Request permissions for <strong>Share on LinkedIn</strong> or <strong>Sign In with LinkedIn</strong> under the "Products" tab.</li>
+                <li>Add your Redirect URI (<code>{linkedInRedirectUri}</code>) under Authorized Redirect URLs in OAuth 2.0 settings.</li>
+                <li>Copy the Client ID and Client Secret into the settings inputs above.</li>
+                <li>Click <strong>Authorize Account</strong> to link your recruiter profile!</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {/* Render Posting Tab */}
+        {linkedinActiveTab === 'post' && (
+          <div className="linkedin-post-view">
+            <div className="linkedin-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', alignItems: 'flex-start' }}>
+              {/* Configuration panel */}
+              <div className="linkedin-card card">
+                <h3 className="card-title">Configure LinkedIn Job Post</h3>
+                
+                <div className="form-group" style={{ marginTop: '1.2rem' }}>
+                  <label className="form-label">Select Job to Post</label>
+                  <select 
+                    className="input-text" 
+                    value={selectedJobForLinkedIn}
+                    onChange={(e) => setSelectedJobForLinkedIn(e.target.value)}
+                  >
+                    {jobs.map(job => (
+                      <option key={job.id} value={job.id}>{job.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Post Destination</label>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                    <button 
+                      type="button" 
+                      className={`btn-secondary ${linkedInPostType === 'member' ? 'active' : ''}`}
+                      onClick={() => setLinkedInPostType('member')}
+                      style={{ flex: 1, backgroundColor: linkedInPostType === 'member' ? 'var(--color-ink-tint)' : 'transparent', borderColor: linkedInPostType === 'member' ? 'var(--color-terracotta)' : 'var(--color-border)' }}
+                    >
+                      Personal Feed
+                    </button>
+                    <button 
+                      type="button" 
+                      className={`btn-secondary ${linkedInPostType === 'company' ? 'active' : ''}`}
+                      onClick={() => setLinkedInPostType('company')}
+                      style={{ flex: 1, backgroundColor: linkedInPostType === 'company' ? 'var(--color-ink-tint)' : 'transparent', borderColor: linkedInPostType === 'company' ? 'var(--color-terracotta)' : 'var(--color-border)' }}
+                    >
+                      Company Page
+                    </button>
+                  </div>
+                </div>
+
+                {linkedInPostType === 'company' && (
+                  <div className="form-group animate-fade-in">
+                    <label className="form-label">LinkedIn Company URN ID</label>
+                    <input 
+                      type="text" 
+                      className="input-text" 
+                      placeholder="e.g. 13245678"
+                      value={linkedInCompanyId}
+                      onChange={(e) => setLinkedInCompanyId(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">Share Text Content</label>
+                  <textarea 
+                    className="input-textarea" 
+                    value={linkedInShareText}
+                    onChange={(e) => setLinkedInShareText(e.target.value)}
+                    rows={8}
+                    placeholder="Enter the post body..."
+                    style={{ fontSize: '0.85rem', lineHeight: '1.4' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '0.3rem' }}>
+                    <span>Auto-formatted from active job specification</span>
+                    <span>{linkedInShareText.length} / 3000 chars</span>
+                  </div>
+                </div>
+
+                {linkedInPostSuccess && (
+                  <div style={{
+                    padding: '0.8rem 1rem', backgroundColor: 'var(--color-sage-light)',
+                    border: '1px solid var(--color-sage)', borderRadius: 'var(--radius-sm)',
+                    marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem'
+                  }}>
+                    <span style={{ color: 'var(--color-sage)', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                      🎉 Job Post Published Successfully!
+                    </span>
+                    {linkedInMode === 'sandbox' ? (
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          alert(`ℹ️ RecruiterPro Sandbox Mode:\n\nThis is a simulated job posting stored in the ATS local database. Live feeds on LinkedIn.com are disabled in Sandbox Mode.\n\nTo view your actual LinkedIn feed, we will now redirect you to: https://www.linkedin.com/feed/`);
+                          window.open('https://www.linkedin.com/feed/', '_blank');
+                        }}
+                        style={{ background: 'none', border: 'none', padding: 0, textDecoration: 'underline', color: 'var(--color-terracotta)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        View Live Post on LinkedIn <ExternalLink size={12} />
+                      </button>
+                    ) : (
+                      <a href={linkedInShareUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--color-terracotta)', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                        View Live Post on LinkedIn <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={handlePostToLinkedIn}
+                  disabled={isPostingToLinkedIn || jobs.length === 0}
+                  style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', padding: '0.8rem' }}
+                >
+                  {isPostingToLinkedIn ? (
+                    <>
+                      <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      Publishing Job Post...
+                    </>
+                  ) : (
+                    <>
+                      <Share2 size={16} /> Publish to LinkedIn
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Feed preview */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <h4 style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', color: 'var(--color-ink-muted)', fontWeight: 'bold' }}>
+                  LinkedIn Feed Preview
+                </h4>
+                
+                <div className="linkedin-feed-preview" style={{
+                  backgroundColor: 'var(--color-paper-light)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1.2rem',
+                  boxShadow: 'var(--shadow-md)'
+                }}>
+                  {/* Preview header */}
+                  <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div style={{
+                      width: '48px', height: '48px', borderRadius: '50%',
+                      backgroundColor: 'var(--color-terracotta)', color: '#fff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 'bold', fontSize: '1.1rem'
+                    }}>
+                      {linkedInConnected ? (linkedInProfile?.name || 'AD').substring(0, 2).toUpperCase() : 'RP'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {linkedInConnected ? (linkedInProfile?.name || 'Recruiter') : 'RecruiterPro ATS'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {linkedInConnected ? (linkedInProfile?.headline || 'Talent Acquisition Lead') : 'ATS Integration'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-ink-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.1rem' }}>
+                        <span>Just now</span>
+                        <span>•</span>
+                        <span>🌐</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Preview text */}
+                  <p style={{
+                    fontSize: '0.85rem', color: 'var(--color-ink)',
+                    whiteSpace: 'pre-line', margin: '0 0 1rem 0',
+                    lineHeight: '1.4'
+                  }}>
+                    {linkedInShareText || 'Post content will appear here when you select an active job...'}
+                  </p>
+
+                  {/* Preview job attachment card */}
+                  {jobs.find(j => j.id === selectedJobForLinkedIn) && (
+                    <div className="preview-job-attachment" style={{
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      overflow: 'hidden',
+                      backgroundColor: 'var(--color-paper)'
+                    }}>
+                      <div style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{
+                          width: '48px', height: '48px', borderRadius: '4px',
+                          backgroundColor: 'var(--color-terracotta-light)', color: 'var(--color-terracotta)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 'bold', fontSize: '1rem', flexShrink: 0
+                        }}>
+                          JO
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <h5 style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem', margin: 0 }}>
+                            {jobs.find(j => j.id === selectedJobForLinkedIn)?.title}
+                          </h5>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', margin: '0.1rem 0 0 0' }}>
+                            RecruiterPro ATS • Remote
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{
+                        borderTop: '1px solid var(--color-border)',
+                        padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        backgroundColor: 'var(--color-paper-darker)'
+                      }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-sage)', fontWeight: 'bold' }}>
+                          ⚡ Easy Apply
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
+                          linkedin.com
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Posting History Table */}
+            <div className="linkedin-card card" style={{ marginTop: '2rem' }}>
+              <h3 className="card-title" style={{ marginBottom: '1.2rem' }}>Active LinkedIn Listings & Analytics</h3>
+              
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                <table className="candidate-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)', color: 'var(--color-ink-muted)' }}>
+                      <th style={{ padding: '0.8rem' }}>Job Posting</th>
+                      <th style={{ padding: '0.8rem' }}>Destination</th>
+                      <th style={{ padding: '0.8rem' }}>Date Posted</th>
+                      <th style={{ padding: '0.8rem' }}>Status</th>
+                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Views</th>
+                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Clicks</th>
+                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Applies</th>
+                      <th style={{ padding: '0.8rem', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {linkedInPostHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
+                          No jobs posted to LinkedIn yet. Select a job above to post.
+                        </td>
+                      </tr>
+                    ) : (
+                      linkedInPostHistory.map(post => (
+                        <tr key={post.id} style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-ink-light)' }}>
+                          <td style={{ padding: '0.8rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>
+                            {post.jobTitle}
+                          </td>
+                          <td style={{ padding: '0.8rem' }}>
+                            <span style={{ textTransform: 'capitalize' }}>{post.postType} feed</span>
+                          </td>
+                          <td style={{ padding: '0.8rem' }}>{post.postedAt}</td>
+                          <td style={{ padding: '0.8rem' }}>
+                            <span className={`badge ${post.status === 'Live' ? 'badge-sage' : 'badge-gold'}`} style={{
+                              padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
+                              backgroundColor: post.status === 'Live' ? 'var(--color-sage-light)' : 'var(--color-paper-darker)',
+                              color: post.status === 'Live' ? 'var(--color-sage)' : 'var(--color-ink-muted)',
+                              border: `1px solid ${post.status === 'Live' ? 'var(--color-sage)' : 'var(--color-border)'}`
+                            }}>
+                              {post.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold' }}>{post.views}</td>
+                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold' }}>{post.clicks}</td>
+                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold', color: 'var(--color-sage)' }}>{post.applies}</td>
+                          <td style={{ padding: '0.8rem', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                              {linkedInMode === 'sandbox' ? (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                  onClick={() => {
+                                    alert(`ℹ️ RecruiterPro Sandbox Mode:\n\nThis is a simulated job posting stored in the ATS local database. Live feeds on LinkedIn.com are disabled in Sandbox Mode.\n\nTo view your actual LinkedIn feed, we will now redirect you to: https://www.linkedin.com/feed/`);
+                                    window.open('https://www.linkedin.com/feed/', '_blank');
+                                  }}
+                                >
+                                  View <ExternalLink size={12} />
+                                </button>
+                              ) : (
+                                <a 
+                                  href={post.shareUrl} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="btn-secondary" 
+                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                >
+                                  View <ExternalLink size={12} />
+                                </a>
+                              )}
+                              {post.status === 'Live' && (
+                                <>
+                                  <button 
+                                    type="button" 
+                                    className="btn-secondary" 
+                                    onClick={() => handleSyncMetrics(post.id)}
+                                    title="Fetch latest views & applies from LinkedIn"
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                                  >
+                                    <RefreshCw size={12} /> Sync
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    className="btn-secondary" 
+                                    onClick={() => handleClosePost(post.id)}
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--color-red)' }}
+                                  >
+                                    Close
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Render Search Tab */}
+        {linkedinActiveTab === 'search' && (
+          <div className="linkedin-search-view">
+            {/* Search Filters Card */}
+            <div className="linkedin-card card" style={{ marginBottom: '1.5rem' }}>
+              <h3 className="card-title">Search Jobs on LinkedIn</h3>
+              
+              <form onSubmit={handleLinkedInJobSearch} style={{ marginTop: '1.2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'flex-end' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Keywords</label>
+                    <input 
+                      type="text" 
+                      className="input-text text-sm" 
+                      placeholder="e.g. React Developer"
+                      value={linkedInSearchQuery}
+                      onChange={(e) => setLinkedInSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Location</label>
+                    <input 
+                      type="text" 
+                      className="input-text text-sm" 
+                      placeholder="e.g. Remote / New York"
+                      value={linkedInSearchLocation}
+                      onChange={(e) => setLinkedInSearchLocation(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Job Type</label>
+                    <select 
+                      className="input-text text-sm"
+                      value={linkedInSearchJobType}
+                      onChange={(e) => setLinkedInSearchJobType(e.target.value)}
+                    >
+                      <option value="all">All Types</option>
+                      <option value="full-time">Full-Time</option>
+                      <option value="part-time">Part-Time</option>
+                      <option value="contract">Contract</option>
+                      <option value="internship">Internship</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Experience Level</label>
+                    <select 
+                      className="input-text text-sm"
+                      value={linkedInSearchExperience}
+                      onChange={(e) => setLinkedInSearchExperience(e.target.value)}
+                    >
+                      <option value="all">All Experience Levels</option>
+                      <option value="entry">Entry Level</option>
+                      <option value="mid-senior">Mid-Senior Level</option>
+                      <option value="director">Director / Executive</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      type="submit" 
+                      className="btn-primary" 
+                      disabled={isSearchingLinkedIn}
+                      style={{ height: '38px', padding: '0 1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      {isSearchingLinkedIn ? (
+                        <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      ) : (
+                        <Search size={16} />
+                      )}
+                      Search
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      className="btn-secondary" 
+                      onClick={() => {
+                        const keywords = linkedInSearchQuery || '';
+                        const location = linkedInSearchLocation || '';
+                        const url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}`;
+                        window.open(url, '_blank');
+                      }}
+                      style={{ height: '38px', padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderStyle: 'dashed' }}
+                      title="Search directly on real LinkedIn.com"
+                    >
+                      <ExternalLink size={14} /> Live Search
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* Results Section */}
+            {isSearchingLinkedIn ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem 0', gap: '1rem' }}>
+                <div className="spinner-large" style={{ width: '40px', height: '40px', border: '3px solid var(--color-terracotta)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: 'var(--color-ink-muted)', fontSize: '0.9rem' }}>Querying LinkedIn API endpoints...</p>
+              </div>
+            ) : !linkedInSearchHasSearched ? (
+              <div className="linkedin-card card" style={{ padding: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '1rem', backgroundColor: 'var(--color-terracotta-light)', borderRadius: '50%', color: 'var(--color-terracotta)' }}>
+                  <Linkedin size={36} />
+                </div>
+                <h4 style={{ fontSize: '1.2rem', color: 'var(--color-ink)' }}>Search External Opportunities</h4>
+                <p style={{ fontSize: '0.9rem', color: 'var(--color-ink-muted)', maxWidth: '400px' }}>
+                  Search for jobs directly on LinkedIn and pull them into RecruiterPro with a single click to start screening and tracking candidate applications.
+                </p>
+              </div>
+            ) : linkedInSearchResults.length === 0 ? (
+              <div className="linkedin-card card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
+                No search results found. Try adjusting keywords or location search queries.
+              </div>
+            ) : (
+              <div className="linkedin-search-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                {linkedInSearchResults.map(job => (
+                  <div key={job.id} className="linkedin-job-card card" style={{
+                    display: 'flex', flexDirection: 'column', height: '100%',
+                    justifyContent: 'space-between', padding: '1.2rem', transition: 'var(--transition-smooth)'
+                  }}>
+                    <div>
+                      {/* Logo and Score */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div style={{
+                          width: '40px', height: '40px', borderRadius: '4px',
+                          backgroundColor: job.logoBg, color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 'bold', fontSize: '0.9rem'
+                        }}>
+                          {job.logoInitials}
+                        </div>
+                        <span className="badge badge-sage" style={{
+                          fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-full)',
+                          backgroundColor: 'var(--color-sage-light)', color: 'var(--color-sage)', border: '1px solid var(--color-sage)'
+                        }}>
+                          98% ATS Match
+                        </span>
+                      </div>
+
+                      {/* Title and Company */}
+                      <h4 style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--color-ink)', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={job.title}>
+                        {job.title}
+                      </h4>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', fontWeight: '500' }}>
+                        {job.company} • {job.location}
+                      </p>
+
+                      <p style={{
+                        fontSize: '0.8rem', color: 'var(--color-ink-light)', marginTop: '0.8rem',
+                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4'
+                      }}>
+                        {job.description.split('\n')[0]}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', marginTop: '1.2rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>{job.salary}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>{job.posted}</span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          type="button" 
+                          className="btn-secondary" 
+                          onClick={() => setSelectedSearchResult(job)}
+                          style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                        >
+                          View Details
+                        </button>
+                        <button 
+                          type="button" 
+                          className="btn-primary" 
+                          onClick={() => handleImportLinkedInJob(job)}
+                          style={{ flex: 1.2, fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
+                        >
+                          <Download size={14} /> Import to ATS
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderLinkedInJobDetailsModal = () => {
+    if (!selectedSearchResult) return null;
+    const job = selectedSearchResult;
+
+    return (
+      <div className="modal-backdrop">
+        <div className="modal-content" style={{ maxWidth: '650px', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}>
+          <div className="modal-header">
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '4px',
+                backgroundColor: job.logoBg, color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 'bold', fontSize: '1rem'
+              }}>
+                {job.logoInitials}
+              </div>
+              <div>
+                <h3 className="modal-title" style={{ fontSize: '1.2rem' }}>{job.title}</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-muted)', margin: 0 }}>
+                  {job.company} • {job.location} • {job.type}
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              className="btn-close" 
+              onClick={() => setSelectedSearchResult(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="modal-body" style={{ overflowY: 'auto', padding: '1.5rem', flex: 1 }}>
+            <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', display: 'block' }}>Salary Range</span>
+                <strong style={{ color: 'var(--color-ink)', fontSize: '0.95rem' }}>{job.salary}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', display: 'block' }}>Experience Level</span>
+                <strong style={{ color: 'var(--color-ink)', fontSize: '0.95rem', textTransform: 'capitalize' }}>{job.experience} level</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', display: 'block' }}>Posted Date</span>
+                <strong style={{ color: 'var(--color-ink)', fontSize: '0.95rem' }}>{job.posted}</strong>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-ink)', marginBottom: '0.5rem' }}>
+                Extracted Skills (Must-Haves)
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {job.requirements.split(',').map((req, i) => (
+                  <span key={i} style={{
+                    fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)',
+                    backgroundColor: 'var(--color-ink-tint)', border: '1px solid var(--color-border)', color: 'var(--color-ink-light)'
+                  }}>
+                    {req.trim()}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-ink)', marginBottom: '0.5rem' }}>
+                Detailed Job Description
+              </h4>
+              <p style={{
+                fontSize: '0.85rem', color: 'var(--color-ink-light)',
+                whiteSpace: 'pre-line', lineHeight: '1.5'
+              }}>
+                {job.description}
+              </p>
+            </div>
+          </div>
+
+          <div className="modal-footer" style={{ borderTop: '1px solid var(--color-border)', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', backgroundColor: 'var(--color-paper-darker)' }}>
+            <button 
+              type="button" 
+              className="btn-secondary" 
+              onClick={() => setSelectedSearchResult(null)}
+            >
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              onClick={() => handleImportLinkedInJob(job)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              <Download size={14} /> Import into Jobs Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLinkedInAuthModal = () => {
+    if (!isLinkedInAuthOpen) return null;
+
+    const handleLogin = (e) => {
+      e.preventDefault();
+      setAuthStep('consent');
+    };
+
+    const handleConsent = () => {
+      setAuthStep('processing');
+      setTimeout(() => {
+        setLinkedInConnected(true);
+        setLinkedInProfile({
+          name: 'Alex Rivera',
+          headline: 'Talent Acquisition Lead at RecruiterPro Inc.',
+          avatar: 'AR',
+          id: 'li-user-128374'
+        });
+        setAuthStep('success');
+        setTimeout(() => {
+          setIsLinkedInAuthOpen(false);
+          setAuthStep('login');
+        }, 1200);
+      }, 1500);
+    };
+
+    return (
+      <div className="modal-backdrop" style={{ zIndex: 9999 }}>
+        <div className="modal-content" style={{ maxWidth: '420px', padding: '1.8rem', borderRadius: 'var(--radius-lg)' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0077b5' }}>
+              <Linkedin size={24} />
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '-0.02em' }}>LinkedIn Authorization</span>
+            </div>
+            {authStep !== 'processing' && authStep !== 'success' && (
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => {
+                  setIsLinkedInAuthOpen(false);
+                  setAuthStep('login');
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)' }}
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+
+          {/* Login Step */}
+          {authStep === 'login' && (
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+                <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Sign in with LinkedIn</h4>
+                <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
+                  Authorize RecruiterPro ATS to link with your account.
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label text-xs">LinkedIn User Email</label>
+                <input 
+                  type="email" 
+                  className="input-text text-sm" 
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label text-xs">Password</label>
+                <input 
+                  type="password" 
+                  className="input-text text-sm" 
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  required 
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                style={{ width: '100%', padding: '0.7rem', backgroundColor: '#0077b5', borderColor: '#0077b5', marginTop: '0.5rem' }}
+              >
+                Sign In
+              </button>
+            </form>
+          )}
+
+          {/* Consent Step */}
+          {authStep === 'consent' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', margin: '0.8rem 0' }}>
+                <div style={{
+                  width: '50px', height: '50px', borderRadius: '10px',
+                  backgroundColor: 'var(--color-terracotta)', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 'bold', fontSize: '1.1rem', boxShadow: 'var(--shadow-sm)'
+                }}>
+                  RP
+                </div>
+                <div style={{ fontSize: '1.5rem', color: 'var(--color-ink-muted)' }}>⇄</div>
+                <div style={{
+                  width: '50px', height: '50px', borderRadius: '10px',
+                  backgroundColor: '#0077b5', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontWeight: 'bold', fontSize: '1.3rem', boxShadow: 'var(--shadow-sm)'
+                }}>
+                  in
+                </div>
+              </div>
+
+              <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Access Request</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-light)', lineHeight: '1.4', textAlign: 'left' }}>
+                <strong>RecruiterPro ATS</strong> is requesting permission to access your LinkedIn account details:
+              </p>
+              
+              <ul style={{
+                textAlign: 'left', paddingLeft: '1.2rem', fontSize: '0.8rem',
+                color: 'var(--color-ink-muted)', display: 'flex', flexDirection: 'column', gap: '0.4rem'
+              }}>
+                <li>Use your profile name, headline, and profile avatar info.</li>
+                <li>Post job updates and links directly to your LinkedIn personal feed.</li>
+                <li>Access and post updates on behalf of your connected Company Pages.</li>
+              </ul>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem' }}>
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  onClick={() => setAuthStep('login')}
+                  style={{ flex: 1, padding: '0.6rem' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={handleConsent}
+                  style={{ flex: 1.5, padding: '0.6rem', backgroundColor: '#0077b5', borderColor: '#0077b5' }}
+                >
+                  Allow & Connect
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Processing Step */}
+          {authStep === 'processing' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0', gap: '1.2rem' }}>
+              <div className="spinner-large" style={{ width: '36px', height: '36px', border: '3px solid #0077b5', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-muted)', margin: 0 }}>
+                Authenticating credentials and fetching token...
+              </p>
+            </div>
+          )}
+
+          {/* Success Step */}
+          {authStep === 'success' && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0', gap: '1rem', textAlign: 'center' }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '50%',
+                backgroundColor: 'var(--color-sage-light)', color: 'var(--color-sage)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '1.8rem', border: '2px solid var(--color-sage)'
+              }}>
+                ✓
+              </div>
+              <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Connection Complete!</h4>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', margin: 0 }}>
+                Account successfully connected to RecruiterPro.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (!session) {
     return renderLoginScreen();
@@ -7177,6 +8987,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         <div className="workspace-content">
           {activeSidebarTab === 'jobs' && renderJobsView()}
           {activeSidebarTab === 'candidates' && renderCandidatesView()}
+          {activeSidebarTab === 'linkedin' && renderLinkedInView()}
           {activeSidebarTab === 'careers' && renderCareersView()}
           {activeSidebarTab === 'templates' && renderTemplatesView()}
           {activeSidebarTab === 'settings' && renderSettingsView()}
@@ -7189,6 +9000,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       {renderCareersPreviewModal()}
       {renderCreateJobModal()}
       {renderSupabaseModal()}
+      {renderLinkedInJobDetailsModal()}
+      {renderLinkedInAuthModal()}
 
       {/* 3. BATCH EMAIL COMPOSER MODAL */}
       {isEmailModalOpen && (
