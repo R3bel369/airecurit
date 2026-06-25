@@ -4874,6 +4874,10 @@ mark.highlight-matched {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
+.cp-toggle.active::after {
+  transform: translateX(22px);
+}
+
 
 /* Old candidate portal styles kept for backward compat */
 .candidate-portal-container {

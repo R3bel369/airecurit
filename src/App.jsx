@@ -641,6 +641,19 @@ function resolveTemplatePlaceholders(templateText, candidate, jobTitle) {
     .replace(/\{\{jobRole\}\}/g, roleName);
 }
 
+const QUIZ_QUESTIONS = {
+  1: [
+    { q: "What is the output of typeof NaN?", options: ["'number'", "'NaN'", "'undefined'", "'object'"], answer: 0 },
+    { q: "Which JS method creates a new filtered array?", options: ["map()", "filter()", "reduce()", "forEach()"], answer: 1 },
+    { q: "What is Promise.all()'s default behavior?", options: ["Runs sequentially", "Resolves when all resolve, rejects when any rejects", "Returns first resolved", "Cancels other promises"], answer: 1 }
+  ],
+  2: [
+    { q: "What is the primary benefit of a CDN?", options: ["Increase web server CPU load", "Cache static content closer to users to reduce latency", "Encrypt database records", "Generate serverless APIs"], answer: 1 },
+    { q: "Which caching strategy writes to both cache and db simultaneously?", options: ["Write-through", "Write-back", "Cache-aside", "Read-through"], answer: 0 },
+    { q: "What is horizontal scaling?", options: ["Adding more resources to one server", "Adding more server nodes to the cluster", "Optimizing query execution plan", "Converting code to serverless"], answer: 1 }
+  ]
+};
+
 const JD_TEMPLATES = {
   react_developer: {
     title: "Senior Frontend Engineer (React)",
@@ -667,6 +680,7 @@ const JD_TEMPLATES = {
 export default function App() {
   // Authentication states
   const [session, setSession] = useState(null);
+  const userRole = session?.user?.user_metadata?.role || (session?.user?.email === 'admink338@gmail.com' ? 'admin' : 'candidate');
   const [authLoading, setAuthLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -696,19 +710,19 @@ export default function App() {
       setLoginError('Email and Password are required.');
       return;
     }
-    // Admin must use the admin email
-    if (loginRole === 'admin' && loginEmail.trim().toLowerCase() !== 'admink338@gmail.com') {
-      setLoginError('Admin access requires the registered admin email.');
-      return;
-    }
     setLoginError(null);
     setIsSigningIn(true);
     try {
-      if (loginMode === 'register' && loginRole === 'candidate') {
-        // Candidate registration
+      if (loginMode === 'register') {
+        // Candidate or Admin registration
         const { data, error } = await supabase.auth.signUp({
           email: loginEmail,
           password: loginPassword,
+          options: {
+            data: {
+              role: loginRole, // 'candidate' or 'admin'
+            }
+          }
         });
         if (error) {
           setLoginError(error.message || 'Registration failed. Try a different email.');
@@ -724,9 +738,20 @@ export default function App() {
             password: loginPassword,
           });
           if (signInData?.session) {
-            setSession(signInData.session);
-            setLoginEmail('');
-            setLoginPassword('');
+            const signedInUser = signInData.user;
+            const actualRole = signedInUser?.user_metadata?.role || (signedInUser?.email === 'admink338@gmail.com' ? 'admin' : 'candidate');
+            
+            if (loginRole === 'admin' && actualRole !== 'admin') {
+              setLoginError('Candidate accounts cannot log in as an HR Recruiter.');
+              await supabase.auth.signOut();
+            } else if (loginRole === 'candidate' && actualRole === 'admin') {
+              setLoginError('Admin accounts cannot log in as a Job Candidate.');
+              await supabase.auth.signOut();
+            } else {
+              setSession(signInData.session);
+              setLoginEmail('');
+              setLoginPassword('');
+            }
           } else {
             // Switch to login mode and show success
             setLoginMode('login');
@@ -743,9 +768,20 @@ export default function App() {
         if (error) {
           setLoginError(error.message || 'Invalid login credentials.');
         } else {
-          setSession(data.session);
-          setLoginEmail('');
-          setLoginPassword('');
+          const signedInUser = data.user;
+          const actualRole = signedInUser?.user_metadata?.role || (signedInUser?.email === 'admink338@gmail.com' ? 'admin' : 'candidate');
+          
+          if (loginRole === 'admin' && actualRole !== 'admin') {
+            setLoginError('Candidate accounts cannot log in as an HR Recruiter.');
+            await supabase.auth.signOut();
+          } else if (loginRole === 'candidate' && actualRole === 'admin') {
+            setLoginError('Admin accounts cannot log in as a Job Candidate.');
+            await supabase.auth.signOut();
+          } else {
+            setSession(data.session);
+            setLoginEmail('');
+            setLoginPassword('');
+          }
         }
       }
     } catch (err) {
@@ -789,6 +825,11 @@ export default function App() {
         const { data: signUpData, error } = await supabase.auth.signUp({
           email: candidateEmail,
           password: candidatePassword,
+          options: {
+            data: {
+              role: 'candidate'
+            }
+          }
         });
         if (error) {
           setCandidateAuthError(error.message || 'Registration failed.');
@@ -1806,17 +1847,194 @@ Requirements:
   ]);
   const [candidateAIInput, setCandidateAIInput] = useState('');
   const [candidateProfileData, setCandidateProfileData] = useState({
-    fullName: '', phone: '', location: '', headline: '', skills: '', education: '', experience: '', bio: ''
+    fullName: '', phone: '', location: '', headline: '', skills: '', education: '', experience: '', bio: '', avatarUrl: '', github: '', linkedin: '', portfolio: ''
   });
 
   useEffect(() => {
-    if (session && session.user && session.user.email !== 'admink338@gmail.com') {
+    if (session && session.user && userRole !== 'admin') {
       const meta = session.user.user_metadata || {};
-      if (meta.candidateProfileData) setCandidateProfileData(meta.candidateProfileData);
-      if (meta.savedJobIds) setSavedJobIds(meta.savedJobIds);
-      if (meta.candidateAIMessages) setCandidateAIMessages(meta.candidateAIMessages);
+      if (meta.candidateProfileData) {
+        setCandidateProfileData(meta.candidateProfileData);
+      } else {
+        // Initialize clean state for a new candidate
+        setCandidateProfileData({
+          fullName: session.user.email.split('@')[0],
+          phone: '',
+          location: '',
+          headline: '',
+          skills: '',
+          education: '',
+          experience: '',
+          bio: '',
+          avatarUrl: '',
+          github: '',
+          linkedin: '',
+          portfolio: ''
+        });
+      }
+      
+      if (meta.savedJobIds) {
+        setSavedJobIds(meta.savedJobIds);
+      } else {
+        setSavedJobIds([]);
+      }
+      
+      if (meta.candidateAIMessages) {
+        setCandidateAIMessages(meta.candidateAIMessages);
+      } else {
+        setCandidateAIMessages([
+          { sender: 'ai', text: "Hi! I'm your AI Career Assistant. I can help you with interview prep, resume tips, career guidance, and job recommendations. What would you like help with today?" }
+        ]);
+      }
+    } else {
+      // Clear out states entirely on logout/sign-out or admin login
+      setCandidateProfileData({
+        fullName: '', phone: '', location: '', headline: '', skills: '', education: '', experience: '', bio: '', avatarUrl: '', github: '', linkedin: '', portfolio: ''
+      });
+      setSavedJobIds([]);
+      setCandidateAIMessages([
+        { sender: 'ai', text: "Hi! I'm your AI Career Assistant. I can help you with interview prep, resume tips, career guidance, and job recommendations. What would you like help with today?" }
+      ]);
     }
-  }, [session]);
+  }, [session, userRole]);
+
+  const [candidateDocuments, setCandidateDocuments] = useState([
+    { id: 1, name: 'Resume_2026_Final.pdf', type: 'Resume', size: '245 KB', date: '2026-06-15', icon: '📄' },
+    { id: 2, name: 'Cover_Letter_TechCorp.docx', type: 'Cover Letter', size: '82 KB', date: '2026-06-14', icon: '📝' },
+    { id: 3, name: 'Portfolio_Samples.zip', type: 'Portfolio', size: '4.2 MB', date: '2026-06-10', icon: '🗂' },
+    { id: 4, name: 'Certifications_AWS.pdf', type: 'Certificate', size: '560 KB', date: '2026-05-28', icon: '🏆' },
+  ]);
+  const [candidateAssessments, setCandidateAssessments] = useState([
+    { id: 1, title: 'JavaScript Proficiency Test', company: 'TechCorp Solutions', duration: '45 min', questions: 3, dueDate: '2026-06-25', status: 'pending', difficulty: 'Intermediate' },
+    { id: 2, title: 'System Design Assessment', company: 'Innovate Labs', duration: '90 min', questions: 3, dueDate: '2026-06-28', status: 'pending', difficulty: 'Advanced' },
+    { id: 3, title: 'React & TypeScript Quiz', company: 'StartupXYZ', duration: '30 min', questions: 3, dueDate: '2026-06-20', status: 'completed', score: 87, difficulty: 'Intermediate' },
+  ]);
+  const [candidateMessages, setCandidateMessages] = useState([
+    { id: 1, from: 'Sarah Johnson', role: 'HR Manager @ TechCorp', avatar: 'SJ', time: '10:30 AM', preview: 'Congrats! You have been shortlisted for the next round...', unread: true, color: '#6366f1', chatHistory: [
+      { sender: 'them', text: 'Hello! Thanks for applying to TechCorp. We reviewed your profile and love your React experience.' },
+      { sender: 'user', text: 'Thank you! I am very excited about the opportunity.' },
+      { sender: 'them', text: 'Congrats! You have been shortlisted for the next round. I will schedule the interview shortly.' }
+    ]},
+    { id: 2, from: 'Michael Chen', role: 'Tech Lead @ Innovate Labs', avatar: 'MC', time: 'Yesterday', preview: 'We reviewed your application and would like to schedule...', unread: true, color: '#8b5cf6', chatHistory: [
+      { sender: 'them', text: 'Hi! Can you discuss your experience with micro-frontends?' },
+      { sender: 'user', text: 'Yes, I have worked with Module Federation in webpack to build micro-frontends.' },
+      { sender: 'them', text: 'We reviewed your application and would like to schedule a technical round.' }
+    ]},
+    { id: 3, from: 'Priya Sharma', role: 'Recruiter @ StartupXYZ', avatar: 'PS', time: '2 days ago', preview: 'Thank you for applying. Our team has been impressed by...', unread: false, color: '#ec4899', chatHistory: [
+      { sender: 'them', text: 'Thank you for applying. Our team has been impressed by your resume.' }
+    ]},
+    { id: 4, from: 'RecruiterPro Team', role: 'Platform Notification', avatar: 'RP', time: '3 days ago', preview: 'Your profile has been viewed 12 times this week!', unread: false, color: '#f59e0b', chatHistory: [
+      { sender: 'them', text: 'Your profile has been viewed 12 times this week!' }
+    ]},
+  ]);
+  const [candidateNotifications, setCandidateNotifications] = useState([
+    { id: 1, icon: '🎯', title: 'Application Viewed', body: 'TechCorp Solutions viewed your profile for Senior React Developer', time: '2 hours ago', unread: true },
+    { id: 2, icon: '📅', title: 'Interview Reminder', body: 'Your interview with Innovate Labs is scheduled for tomorrow at 11:00 AM', time: '5 hours ago', unread: true },
+    { id: 3, icon: '⭐', title: 'New Recommendation', body: '3 new jobs match your profile — Senior Frontend Engineer at Google, Meta, and Netflix', time: '1 day ago', unread: false },
+    { id: 4, icon: '✅', title: 'Assessment Completed', body: 'Your React & TypeScript quiz results: 87/100. Great job!', time: '2 days ago', unread: false },
+    { id: 5, icon: '💼', title: 'Application Status Update', body: 'StartupXYZ moved your application to the Interview stage', time: '3 days ago', unread: false },
+  ]);
+  const [settingsPreferences, setSettingsPreferences] = useState({
+    emailNotifications: true,
+    statusUpdates: true,
+    reminders: true,
+    recommendations: false,
+    visibility: 'Public'
+  });
+  
+  const [activeAssessmentQuiz, setActiveAssessmentQuiz] = useState(null);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [activePracticeTopic, setActivePracticeTopic] = useState(null);
+  const [practiceAnswer, setPracticeAnswer] = useState('');
+  const [practiceFeedback, setPracticeFeedback] = useState(null);
+  const [practiceLoading, setPracticeLoading] = useState(false);
+  const [activeChatMsg, setActiveChatMsg] = useState(null);
+  const [newMessageText, setNewMessageText] = useState('');
+
+  const handleCandidateFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const sizeStr = file.size > 1024 * 1024 
+      ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+      : (file.size / 1024).toFixed(0) + ' KB';
+    const newDoc = {
+      id: Date.now(),
+      name: file.name,
+      type: file.name.endsWith('.docx') ? 'Cover Letter' : 'Resume',
+      size: sizeStr,
+      date: new Date().toLocaleDateString(),
+      icon: file.name.endsWith('.docx') ? '📝' : '📄'
+    };
+    setCandidateDocuments(prev => [newDoc, ...prev]);
+    alert(`🎉 Successfully uploaded ${file.name}!`);
+  };
+
+  const handleCandidatePasteUpload = () => {
+    if (!pasteText.trim()) return;
+    const name = pasteName.trim() || 'Pasted_Resume.txt';
+    const newDoc = {
+      id: Date.now(),
+      name: name.endsWith('.txt') ? name : name + '.txt',
+      type: 'Resume',
+      size: `${(pasteText.length / 1024).toFixed(1)} KB`,
+      date: new Date().toLocaleDateString(),
+      icon: '📄'
+    };
+    setCandidateDocuments(prev => [newDoc, ...prev]);
+    setPasteFallbackOpen(false);
+    setPasteName('');
+    setPasteText('');
+    alert(`🎉 Document "${newDoc.name}" added to Resume Center!`);
+  };
+
+  const handleQuickApply = (job) => {
+    const candidateId = 'portal-' + Math.random().toString(36).substring(7);
+    const resumeText = `${session.user.email.split('@')[0]}\nEmail: ${session.user.email}\n\nExperience: 5+ years React Developer. Skills: React, TypeScript, Redux, Tailwind CSS.`;
+    const tempCand = {
+      id: candidateId, name: session.user.email.split('@')[0], text: resumeText,
+      noticePeriod: null, currentCtc: null, expectedCtc: null, location: null,
+      preferredLocation: null, resumeQuality: null, scorecard: null, activityLog: null
+    };
+    const evalData = analyzeCandidateOffline(tempCand, job.title, job.description || 'Google is hiring.', job.tags?.join(', ') || 'React');
+    const timeStr = new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const mockRatings = {
+      recruiter: evalData.scorecard,
+      technical: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "Awaiting technical review." },
+      hr: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "Awaiting HR review." }
+    };
+    
+    const newCandidate = {
+      id: candidateId, name: session.user.email.split('@')[0],
+      fileName: `${job.title.replace(/\s+/g, '_')}_Resume.txt`,
+      fileSize: resumeText.length, status: 'completed', ocrProgress: 0, text: resumeText,
+      numChars: resumeText.length, errorDetails: '', score: evalData.calculatedScore,
+      evaluation: evalData, stage: 'screening', noticePeriod: evalData.notice_period,
+      currentCtc: evalData.current_ctc, expectedCtc: evalData.expected_ctc,
+      location: evalData.location, preferredLocation: evalData.preferred_location,
+      resumeQuality: evalData.resume_quality, scorecard: evalData.scorecard,
+      activityLog: [
+        { id: 1, type: "applied", text: `Candidate applied via Quick Apply for job: ${job.title}`, timestamp: timeStr },
+        { id: 2, type: "screened", text: `ATS Match Screen complete. ATS Score: ${evalData.calculatedScore}%`, timestamp: timeStr }
+      ],
+      jobsData: {
+        [job.id]: {
+          score: evalData.calculatedScore, evaluation: evalData, stage: 'screening',
+          scorecard: evalData.scorecard, collaboratorRatings: mockRatings,
+          activityLog: [
+            { id: 1, type: "applied", text: `Candidate applied via Quick Apply for job: ${job.title}`, timestamp: timeStr },
+            { id: 2, type: "screened", text: `ATS Match Screen complete. ATS Score: ${evalData.calculatedScore}%`, timestamp: timeStr }
+          ]
+        }
+      }
+    };
+    
+    setCandidates(prev => [...prev, newCandidate]);
+    alert(`🎉 Applied to ${job.title} at ${job.company} successfully! ATS Match: ${evalData.calculatedScore}%`);
+  };
+
+  const handleMarkNotificationRead = (id) => {
+    setCandidateNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+  };
 
   const saveCandidateMetadata = async (profile, savedJobs, chatMessages) => {
     if (!session || !session.user) return;
@@ -4994,6 +5212,10 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
   };
 
   const renderCandidateDashboard = () => {
+    const dummyAssessments = candidateAssessments;
+    const dummyMessages = candidateMessages;
+    const dummyDocuments = candidateDocuments;
+    const dummyNotifications = candidateNotifications;
 
     const handleApplySubmit = (e) => {
       e.preventDefault();
@@ -5048,25 +5270,6 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
     const displayName = userName.charAt(0).toUpperCase() + userName.slice(1);
     const candidateApplications = candidates.filter(c => extractEmail(c).toLowerCase() === session.user.email.toLowerCase());
 
-
-    // Dummy data for sections
-    const dummyAssessments = [
-      { id: 1, title: 'JavaScript Proficiency Test', company: 'TechCorp Solutions', duration: '45 min', questions: 30, dueDate: '2026-06-25', status: 'pending', difficulty: 'Intermediate' },
-      { id: 2, title: 'System Design Assessment', company: 'Innovate Labs', duration: '90 min', questions: 5, dueDate: '2026-06-28', status: 'pending', difficulty: 'Advanced' },
-      { id: 3, title: 'React & TypeScript Quiz', company: 'StartupXYZ', duration: '30 min', questions: 20, dueDate: '2026-06-20', status: 'completed', score: 87, difficulty: 'Intermediate' },
-    ];
-    const dummyMessages = [
-      { id: 1, from: 'Sarah Johnson', role: 'HR Manager @ TechCorp', avatar: 'SJ', time: '10:30 AM', preview: 'Congrats! You have been shortlisted for the next round...', unread: true, color: '#6366f1' },
-      { id: 2, from: 'Michael Chen', role: 'Tech Lead @ Innovate Labs', avatar: 'MC', time: 'Yesterday', preview: 'We reviewed your application and would like to schedule...', unread: true, color: '#8b5cf6' },
-      { id: 3, from: 'Priya Sharma', role: 'Recruiter @ StartupXYZ', avatar: 'PS', time: '2 days ago', preview: 'Thank you for applying. Our team has been impressed by...', unread: false, color: '#ec4899' },
-      { id: 4, from: 'RecruiterPro Team', role: 'Platform Notification', avatar: 'RP', time: '3 days ago', preview: 'Your profile has been viewed 12 times this week!', unread: false, color: '#f59e0b' },
-    ];
-    const dummyDocuments = [
-      { id: 1, name: 'Resume_2026_Final.pdf', type: 'Resume', size: '245 KB', date: '2026-06-15', icon: '📄' },
-      { id: 2, name: 'Cover_Letter_TechCorp.docx', type: 'Cover Letter', size: '82 KB', date: '2026-06-14', icon: '📝' },
-      { id: 3, name: 'Portfolio_Samples.zip', type: 'Portfolio', size: '4.2 MB', date: '2026-06-10', icon: '🗂' },
-      { id: 4, name: 'Certifications_AWS.pdf', type: 'Certificate', size: '560 KB', date: '2026-05-28', icon: '🏆' },
-    ];
     const dummyInterviews = candidateApplications.flatMap(c => {
       const jIds = Object.keys(c.jobsData || {});
       return jIds.map(jId => {
@@ -5085,13 +5288,6 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         return { ...jd, jobTitle: job.title, candidateId: c.id, jId };
       }).filter(Boolean);
     });
-    const dummyNotifications = [
-      { id: 1, icon: '🎯', title: 'Application Viewed', body: 'TechCorp Solutions viewed your profile for Senior React Developer', time: '2 hours ago', unread: true },
-      { id: 2, icon: '📅', title: 'Interview Reminder', body: 'Your interview with Innovate Labs is scheduled for tomorrow at 11:00 AM', time: '5 hours ago', unread: true },
-      { id: 3, icon: '⭐', title: 'New Recommendation', body: '3 new jobs match your profile — Senior Frontend Engineer at Google, Meta, and Netflix', time: '1 day ago', unread: false },
-      { id: 4, icon: '✅', title: 'Assessment Completed', body: 'Your React & TypeScript quiz results: 87/100. Great job!', time: '2 days ago', unread: false },
-      { id: 5, icon: '💼', title: 'Application Status Update', body: 'StartupXYZ moved your application to the Interview stage', time: '3 days ago', unread: false },
-    ];
     const recommendedJobs = [
       { id: 'rec-1', title: 'Senior React Developer', company: 'Google', location: 'Bangalore / Remote', salary: '40–55 LPA', match: 94, tags: ['React', 'TypeScript', 'GraphQL'] },
       { id: 'rec-2', title: 'Frontend Architect', company: 'Meta', location: 'Hyderabad', salary: '35–50 LPA', match: 89, tags: ['React', 'Redux', 'Performance'] },
@@ -5135,7 +5331,13 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 <h1 className="cp-welcome-title">Welcome back, {displayName}! 👋</h1>
                 <p className="cp-welcome-sub">Your career journey at a glance. {candidateApplications.length > 0 ? `You have ${candidateApplications.length} active application(s).` : 'Start applying to jobs today!'}</p>
               </div>
-              <div className="cp-welcome-avatar">{displayName.charAt(0).toUpperCase()}</div>
+              <div className="cp-welcome-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {candidateProfileData.avatarUrl ? (
+                  <img src={candidateProfileData.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  displayName.charAt(0).toUpperCase()
+                )}
+              </div>
             </div>
 
             {/* Stats Row */}
@@ -5243,71 +5445,216 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           </div>
         );
 
-        case 'profile': return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={20} style={{ color: '#6366f1' }} /> My Profile</h2><p>Complete your profile to increase visibility to recruiters.</p></div>
-            {/* Profile Completion */}
-            <div className="cp-section-card">
-              <div className="cp-section-header"><span>Profile Completion</span></div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-                <div className="cp-profile-avatar">{displayName.charAt(0)}</div>
-                <div>
-                  <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>{displayName}</div>
-                  <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.82rem' }}>{session.user.email}</div>
-                  <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><AlertCircle size={14} /> Profile 40% complete — Add details to attract recruiters</div>
+        case 'profile': {
+          let fieldsCount = 0;
+          let filledCount = 0;
+          const fields = ['fullName', 'phone', 'location', 'headline', 'bio', 'skills', 'experience', 'education', 'avatarUrl', 'linkedin', 'github', 'portfolio'];
+          fields.forEach(f => {
+            fieldsCount++;
+            if (candidateProfileData[f] && candidateProfileData[f].toString().trim() !== '') {
+              filledCount++;
+            }
+          });
+          const completionPercentage = Math.round((filledCount / fieldsCount) * 100);
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><User size={20} style={{ color: '#6366f1' }} /> My Profile</h2><p>Complete your profile to increase visibility to recruiters.</p></div>
+              
+              {/* Profile Completion */}
+              <div className="cp-section-card">
+                <div className="cp-section-header"><span>Profile Completion</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                  {candidateProfileData.avatarUrl ? (
+                    <img src={candidateProfileData.avatarUrl} alt="Avatar" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #6366f1' }} />
+                  ) : (
+                    <div className="cp-profile-avatar">{displayName.charAt(0)}</div>
+                  )}
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '1.1rem' }}>{candidateProfileData.fullName || displayName}</div>
+                    <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.82rem' }}>{session.user.email}</div>
+                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: completionPercentage < 70 ? '#f59e0b' : '#10b981', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <AlertCircle size={14} /> Profile {completionPercentage}% complete — {completionPercentage < 100 ? 'Add more details to attract recruiters!' : 'Perfect! Your profile is complete.'}
+                    </div>
+                  </div>
+                </div>
+                <div className="cp-progress-bar-track"><div className="cp-progress-bar-fill" style={{ width: `${completionPercentage}%` }} /></div>
+              </div>
+
+              {/* Profile Avatar Options */}
+              <div className="cp-section-card">
+                <div className="cp-section-header"><span>Profile Picture & Avatar</span></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[
+                      { name: 'Sofia (Lead)', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80' },
+                      { name: 'Alex (Dev)', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80' },
+                      { name: 'Maya (Designer)', url: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&h=150&q=80' },
+                      { name: 'David (PM)', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=150&h=150&q=80' },
+                      { name: 'Sarah (Frontend)', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80' },
+                    ].map(avatar => {
+                      const isSelected = candidateProfileData.avatarUrl === avatar.url;
+                      return (
+                        <button key={avatar.name} type="button" style={{ position: 'relative', border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
+                          onClick={() => setCandidateProfileData(p => ({ ...p, avatarUrl: avatar.url }))}>
+                          <img src={avatar.url} alt={avatar.name} style={{ width: '50px', height: '50px', borderRadius: '50%', objectFit: 'cover', border: isSelected ? '3px solid #6366f1' : '2px solid transparent', padding: '2px', transition: 'border-color 0.2s' }} />
+                          {isSelected && <span style={{ position: 'absolute', bottom: 0, right: 0, background: '#6366f1', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>✓</span>}
+                        </button>
+                      );
+                    })}
+                    <input type="file" id="candidate-avatar-file-input" accept="image/*" style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          if (file.size > 2 * 1024 * 1024) {
+                            alert('Image size exceeds 2MB limit.');
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = (uploadEvent) => {
+                            setCandidateProfileData(p => ({ ...p, avatarUrl: uploadEvent.target.result }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }} />
+                    <button type="button" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      onClick={() => document.getElementById('candidate-avatar-file-input').click()}>
+                      <Upload size={13} /> Upload File...
+                    </button>
+                    <button type="button" className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
+                      onClick={() => {
+                        const customUrl = prompt('Enter image URL:');
+                        if (customUrl) setCandidateProfileData(p => ({ ...p, avatarUrl: customUrl }));
+                      }}>
+                      Custom URL...
+                    </button>
+                    {candidateProfileData.avatarUrl && (
+                      <button type="button" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.05)', borderRadius: '6px' }}
+                        onClick={() => setCandidateProfileData(p => ({ ...p, avatarUrl: '' }))}>
+                        Clear Pic
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="cp-progress-bar-track"><div className="cp-progress-bar-fill" style={{ width: '40%' }} /></div>
-            </div>
-            <div className="cp-section-card">
-              <div className="cp-section-header"><span>Basic Information</span></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                {[
-                  { label: 'Full Name', key: 'fullName', placeholder: `${displayName} Sharma` },
-                  { label: 'Phone Number', key: 'phone', placeholder: '+91 98765 43210' },
-                  { label: 'Location', key: 'location', placeholder: 'Bangalore, India' },
-                  { label: 'Professional Headline', key: 'headline', placeholder: 'Senior React Developer | 5+ Years' },
-                ].map(field => (
-                  <div key={field.key} className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label text-xs">{field.label}</label>
-                    <input type="text" className="input-text" placeholder={field.placeholder}
-                      value={candidateProfileData[field.key]}
-                      onChange={e => setCandidateProfileData(p => ({ ...p, [field.key]: e.target.value }))} />
+
+              {/* Basic Info */}
+              <div className="cp-section-card">
+                <div className="cp-section-header"><span>Basic Information</span></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { label: 'Full Name', key: 'fullName', placeholder: `${displayName} Sharma` },
+                    { label: 'Phone Number', key: 'phone', placeholder: '+91 98765 43210' },
+                    { label: 'Location', key: 'location', placeholder: 'Bangalore, India' },
+                    { label: 'Professional Headline', key: 'headline', placeholder: 'Senior React Developer | 5+ Years' },
+                  ].map(field => (
+                    <div key={field.key} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label text-xs">{field.label}</label>
+                      <input type="text" className="input-text" placeholder={field.placeholder}
+                        value={candidateProfileData[field.key] || ''}
+                        onChange={e => setCandidateProfileData(p => ({ ...p, [field.key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
+                  <label className="form-label text-xs">Professional Bio</label>
+                  <textarea className="input-textarea" style={{ minHeight: '80px' }} placeholder="Write a brief professional summary..."
+                    value={candidateProfileData.bio || ''}
+                    onChange={e => setCandidateProfileData(p => ({ ...p, bio: e.target.value }))} />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
+                  <label className="form-label text-xs">Key Skills (comma separated)</label>
+                  <input type="text" className="input-text" placeholder="React, TypeScript, Node.js, AWS, Redux"
+                    value={candidateProfileData.skills || ''}
+                    onChange={e => setCandidateProfileData(p => ({ ...p, skills: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Work & Education Details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div className="cp-section-card" style={{ margin: 0 }}>
+                  <div className="cp-section-header"><span>Work Experience</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label text-xs">Job Title / Role</label>
+                      <input type="text" className="input-text" placeholder="Software Engineer"
+                        value={candidateProfileData.experience || ''}
+                        onChange={e => setCandidateProfileData(p => ({ ...p, experience: e.target.value }))} />
+                    </div>
                   </div>
-                ))}
+                </div>
+
+                <div className="cp-section-card" style={{ margin: 0 }}>
+                  <div className="cp-section-header"><span>Education</span></div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label text-xs">Degree & School</label>
+                      <input type="text" className="input-text" placeholder="B.Tech in Computer Science, IIT"
+                        value={candidateProfileData.education || ''}
+                        onChange={e => setCandidateProfileData(p => ({ ...p, education: e.target.value }))} />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
-                <label className="form-label text-xs">Professional Bio</label>
-                <textarea className="input-textarea" style={{ minHeight: '100px' }} placeholder="Write a brief professional summary..."
-                  value={candidateProfileData.bio}
-                  onChange={e => setCandidateProfileData(p => ({ ...p, bio: e.target.value }))} />
+
+              {/* Professional & Social Links */}
+              <div className="cp-section-card">
+                <div className="cp-section-header"><span>Professional Links</span></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { label: 'LinkedIn Profile', key: 'linkedin', placeholder: 'https://linkedin.com/in/username' },
+                    { label: 'GitHub Profile', key: 'github', placeholder: 'https://github.com/username' },
+                    { label: 'Portfolio URL', key: 'portfolio', placeholder: 'https://username.dev' },
+                  ].map(link => (
+                    <div key={link.key} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label text-xs">{link.label}</label>
+                      <input type="text" className="input-text" placeholder={link.placeholder}
+                        value={candidateProfileData[link.key] || ''}
+                        onChange={e => setCandidateProfileData(p => ({ ...p, [link.key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
+                <button className="cp-action-btn" style={{ marginTop: '1.5rem', width: 'auto', padding: '0.6rem 2.25rem' }}
+                  onClick={async () => {
+                    await saveCandidateMetadata(candidateProfileData, null, null);
+                    alert('Profile saved successfully!');
+                  }}>Save Profile Changes</button>
               </div>
-              <div className="form-group" style={{ marginBottom: 0, marginTop: '1rem' }}>
-                <label className="form-label text-xs">Key Skills (comma separated)</label>
-                <input type="text" className="input-text" placeholder="React, TypeScript, Node.js, AWS, Redux"
-                  value={candidateProfileData.skills}
-                  onChange={e => setCandidateProfileData(p => ({ ...p, skills: e.target.value }))} />
-              </div>
-              <button className="cp-action-btn" style={{ marginTop: '1rem', width: 'auto', padding: '0.6rem 2rem' }}
-                onClick={async () => {
-                  await saveCandidateMetadata(candidateProfileData, null, null);
-                  alert('Profile saved successfully!');
-                }}>Save Profile</button>
             </div>
-          </div>
-        );
+          );
+        }
 
         case 'resume': return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><FileText size={20} style={{ color: '#6366f1' }} /> Resume Center</h2><p>Manage your resumes and cover letters.</p></div>
             <div className="cp-section-card">
               <div className="cp-section-header"><span>Upload New Resume</span></div>
-              <div className="cp-upload-zone" onClick={() => setPasteFallbackOpen(true)}>
+              <div className="cp-upload-zone" onClick={() => document.getElementById('candidate-resume-uploader').click()} style={{ cursor: 'pointer' }}>
                 <Upload size={36} style={{ color: '#6366f1', marginBottom: '0.75rem' }} />
                 <div style={{ fontWeight: '700', marginBottom: '0.25rem' }}>Drag & Drop or Click to Upload</div>
                 <div className="cp-app-date">PDF, DOCX, TXT up to 5MB</div>
+                <input type="file" id="candidate-resume-uploader" onChange={handleCandidateFileUpload} style={{ display: 'none' }} accept=".pdf,.docx,.txt" />
               </div>
-              <div style={{ marginTop: '1rem' }}>
+              
+              <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <button type="button" className="btn-secondary" style={{ padding: '0.4rem 1rem', fontSize: '0.78rem' }} onClick={() => setPasteFallbackOpen(!pasteFallbackOpen)}>
+                  {pasteFallbackOpen ? 'Hide Paste Form' : 'Paste Resume Text instead'}
+                </button>
+              </div>
+
+              {pasteFallbackOpen && (
+                <div style={{ marginTop: '1rem', background: 'var(--color-paper-light)', border: '1px dashed var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', marginBottom: '0.5rem' }}>Paste Resume Text:</div>
+                  <input type="text" className="input-text" placeholder="Document Name (e.g. My_React_Resume.txt)" value={pasteName} onChange={e => setPasteName(e.target.value)} style={{ marginBottom: '0.75rem' }} />
+                  <textarea className="input-textarea" placeholder="Paste resume copy here..." value={pasteText} onChange={e => setPasteText(e.target.value)} style={{ minHeight: '120px', marginBottom: '0.75rem' }} />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="cp-action-btn" style={{ width: 'auto', padding: '0.4rem 1.25rem' }} onClick={handleCandidatePasteUpload} disabled={!pasteText.trim()}>Save Document</button>
+                    <button className="btn-secondary" style={{ padding: '0.4rem 1rem' }} onClick={() => { setPasteFallbackOpen(false); setPasteName(''); setPasteText(''); }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: '1.5rem' }}>
                 <div className="cp-section-header"><span>Your Documents</span></div>
                 {dummyDocuments.map(doc => (
                   <div key={doc.id} className="cp-doc-row">
@@ -5317,8 +5664,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                       <div className="cp-app-date">{doc.type} · {doc.size} · {doc.date}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="cp-action-btn-sm" onClick={() => alert('Downloading...')}>Download</button>
-                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }} onClick={() => alert('Deleted!')}>Delete</button>
+                      <button className="cp-action-btn-sm" onClick={() => alert(`Downloading ${doc.name}...`)}>Download</button>
+                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }} onClick={() => { setCandidateDocuments(prev => prev.filter(d => d.id !== doc.id)); alert('Document deleted!'); }}>Delete</button>
                     </div>
                   </div>
                 ))}
@@ -5465,7 +5812,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                     <div className="cp-match-badge" style={{ fontSize: '1rem', padding: '0.4rem 0.75rem' }}>{j.match}% Match</div>
-                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert('Applying...')}>Quick Apply</button>
+                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => handleQuickApply(j)}>Quick Apply</button>
                   </div>
                 </div>
               </div>
@@ -5548,7 +5895,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                     {a.status === 'completed' && <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}><CheckCircle size={12} /> Score: {a.score}/100</div>}
                   </div>
                   {a.status === 'pending' ? (
-                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert('Assessment started!')}>Start Now</button>
+                    <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => setActiveAssessmentQuiz(a)}>Start Now</button>
                   ) : (
                     <span className="cp-stage-badge" style={{ background: '#10b98120', color: '#10b981' }}>Completed</span>
                   )}
@@ -5577,7 +5924,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
                     <span className="cp-stage-badge" style={{ background: '#f59e0b20', color: '#f59e0b' }}>Upcoming</span>
-                    <button className="cp-action-btn" style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => setActiveCandidateNavTab('ai-interview')}>Prep with AI <Sparkles size={13} /></button>
+                    <button className="cp-action-btn" style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => setActivePracticeTopic({ id: 1, topic: 'React Deep Dive', questions: 25, difficulty: 'Advanced', progress: 60 })}>Prep with AI <Sparkles size={13} /></button>
                   </div>
                 </div>
               </div>
@@ -5641,8 +5988,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                       <div className="cp-app-date">{doc.type} · {doc.size} · Uploaded {doc.date}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="cp-action-btn-sm" onClick={() => alert('Downloading...')}>Download</button>
-                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => alert('Deleted!')}><Trash2 size={13} /> Delete</button>
+                      <button className="cp-action-btn-sm" onClick={() => alert(`Downloading ${doc.name}...`)}>Download</button>
+                      <button className="cp-action-btn-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} onClick={() => { setCandidateDocuments(prev => prev.filter(d => d.id !== doc.id)); alert('Document deleted!'); }}><Trash2 size={13} /> Delete</button>
                     </div>
                   </div>
                 ))}
@@ -5657,7 +6004,11 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><MessageSquare size={20} style={{ color: '#6366f1' }} /> Messages</h2><p>{dummyMessages.filter(m => m.unread).length} unread message(s).</p></div>
             <div className="cp-section-card" style={{ padding: 0, overflow: 'hidden' }}>
               {dummyMessages.map((msg, idx) => (
-                <div key={msg.id} className="cp-message-row" style={{ borderBottom: idx < dummyMessages.length - 1 ? '1px solid var(--color-border)' : 'none', background: msg.unread ? 'var(--color-paper-light)' : 'transparent' }}>
+                <div key={msg.id} className="cp-message-row" style={{ borderBottom: idx < dummyMessages.length - 1 ? '1px solid var(--color-border)' : 'none', background: msg.unread ? 'var(--color-paper-light)' : 'transparent', cursor: 'pointer' }}
+                  onClick={() => {
+                    setActiveChatMsg(msg);
+                    setCandidateMessages(prev => prev.map(m => m.id === msg.id ? { ...m, unread: false } : m));
+                  }}>
                   <div className="cp-msg-avatar" style={{ background: msg.color }}>{msg.avatar}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -5690,7 +6041,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
               <div className="cp-page-header"><h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Bell size={20} style={{ color: '#6366f1' }} /> Notifications</h2><p>{dummyNotifications.filter(n => n.unread).length} new notification(s).</p></div>
               <div className="cp-section-card" style={{ padding: 0, overflow: 'hidden' }}>
                 {dummyNotifications.map((n, idx) => (
-                  <div key={n.id} className="cp-message-row" style={{ borderBottom: idx < dummyNotifications.length - 1 ? '1px solid var(--color-border)' : 'none', background: n.unread ? 'var(--color-paper-light)' : 'transparent' }}>
+                  <div key={n.id} className="cp-message-row" style={{ borderBottom: idx < dummyNotifications.length - 1 ? '1px solid var(--color-border)' : 'none', background: n.unread ? 'var(--color-paper-light)' : 'transparent', cursor: 'pointer' }}
+                    onClick={() => handleMarkNotificationRead(n.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: 'var(--color-paper-darker)', borderRadius: '8px', flexShrink: 0 }}>
                       {renderNotificationIcon(n.icon)}
                     </div>
@@ -5784,7 +6136,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                     <div style={{ fontWeight: '800', fontSize: '1rem' }}>{topic.topic}</div>
                     <div className="cp-app-date">{topic.questions} questions · <span style={{ color: topic.difficulty === 'Advanced' ? '#ef4444' : topic.difficulty === 'Intermediate' ? '#f59e0b' : '#10b981' }}>{topic.difficulty}</span></div>
                   </div>
-                  <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => alert(`Starting ${topic.topic} practice!`)}>Practice Now</button>
+                  <button className="cp-action-btn" style={{ fontSize: '0.78rem', padding: '0.4rem 1rem' }} onClick={() => { setActivePracticeTopic(topic); setPracticeAnswer(''); setPracticeFeedback(null); }}>Practice Now</button>
                 </div>
                 <div className="cp-progress-bar-track">
                   <div className="cp-progress-bar-fill" style={{ width: `${topic.progress}%`, background: topic.progress > 70 ? '#10b981' : topic.progress > 40 ? '#f59e0b' : '#6366f1' }} />
@@ -5810,8 +6162,12 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   <button className="cp-action-btn-sm" onClick={() => alert('Password reset link sent to your email.')}>Reset</button>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <div><div style={{ fontWeight: '700' }}>Profile Visibility</div><div className="cp-app-date">Public — Visible to all recruiters</div></div>
-                  <button className="cp-action-btn-sm" onClick={() => alert('Visibility updated to Private!')}>Toggle</button>
+                  <div><div style={{ fontWeight: '700' }}>Profile Visibility</div><div className="cp-app-date">{settingsPreferences.visibility} — Visible to {settingsPreferences.visibility === 'Public' ? 'all recruiters' : 'none'}</div></div>
+                  <button className="cp-action-btn-sm" onClick={() => {
+                    const nextVis = settingsPreferences.visibility === 'Public' ? 'Private' : 'Public';
+                    setSettingsPreferences(p => ({ ...p, visibility: nextVis }));
+                    alert(`Visibility updated to ${nextVis}!`);
+                  }}>Toggle</button>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0' }}>
                   <div><div style={{ fontWeight: '700', color: '#ef4444' }}>Delete Account</div><div className="cp-app-date">Permanently delete your account and all data</div></div>
@@ -5822,16 +6178,20 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <div className="cp-section-card">
               <div className="cp-section-header"><span>Notifications</span></div>
               {[
-                { label: 'Email Notifications', sub: 'Receive updates via email', defaultOn: true },
-                { label: 'Application Status Updates', sub: 'When your stage changes', defaultOn: true },
-                { label: 'Interview Reminders', sub: '24 hours before your interview', defaultOn: true },
-                { label: 'Job Recommendations', sub: 'Weekly curated job matches', defaultOn: false },
-              ].map(setting => (
-                <div key={setting.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
-                  <div><div style={{ fontWeight: '700', fontSize: '0.88rem' }}>{setting.label}</div><div className="cp-app-date">{setting.sub}</div></div>
-                  <div className="cp-toggle" style={{ background: setting.defaultOn ? '#6366f1' : 'var(--color-border)' }} onClick={() => {}} />
-                </div>
-              ))}
+                { label: 'Email Notifications', sub: 'Receive updates via email', key: 'emailNotifications' },
+                { label: 'Application Status Updates', sub: 'When your stage changes', key: 'statusUpdates' },
+                { label: 'Interview Reminders', sub: '24 hours before your interview', key: 'reminders' },
+                { label: 'Job Recommendations', sub: 'Weekly curated job matches', key: 'recommendations' },
+              ].map(setting => {
+                const isOn = settingsPreferences[setting.key];
+                return (
+                  <div key={setting.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <div><div style={{ fontWeight: '700', fontSize: '0.88rem' }}>{setting.label}</div><div className="cp-app-date">{setting.sub}</div></div>
+                    <div className={`cp-toggle ${isOn ? 'active' : ''}`} style={{ background: isOn ? '#6366f1' : 'var(--color-border)' }}
+                      onClick={() => setSettingsPreferences(p => ({ ...p, [setting.key]: !p[setting.key] }))} />
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -5871,7 +6231,13 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             </button>
           </nav>
           <div className="cp-sidebar-user">
-            <div className="cp-sidebar-avatar">{displayName.charAt(0)}</div>
+            <div className="cp-sidebar-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {candidateProfileData.avatarUrl ? (
+                <img src={candidateProfileData.avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                displayName.charAt(0)
+              )}
+            </div>
             <div className="cp-sidebar-user-info">
               <div className="cp-sidebar-name">{displayName}</div>
               <div className="cp-sidebar-email">{session.user.email}</div>
@@ -5950,6 +6316,379 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             </div>
           );
         })()}
+
+        {/* Interactive Quiz Modal */}
+        {activeAssessmentQuiz && (() => {
+          const questions = QUIZ_QUESTIONS[activeAssessmentQuiz.id] || [];
+          return (
+            <div className="modal-backdrop" style={{ zIndex: 10002 }}>
+              <div className="modal-content" style={{ width: '600px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '90vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6366f1' }}>
+                    <Award size={20} /> {activeAssessmentQuiz.title}
+                  </h3>
+                  <button type="button" className="btn-close" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => { setActiveAssessmentQuiz(null); setQuizAnswers({}); }}><X size={20} /></button>
+                </div>
+                <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>
+                  Duration: {activeAssessmentQuiz.duration} · {questions.length} Questions · Pass mark: 70%
+                </div>
+                
+                {questions.length === 0 ? (
+                  <p style={{ textAlign: 'center', color: '#ef4444' }}>No questions available for this quiz.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    {questions.map((item, qIdx) => {
+                      const selectedVal = quizAnswers[qIdx];
+                      return (
+                        <div key={qIdx} style={{ background: 'var(--color-paper-light)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+                          <div style={{ fontWeight: '800', fontSize: '0.92rem', marginBottom: '0.75rem', color: 'var(--color-ink)' }}>
+                            {qIdx + 1}. {item.q}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {item.options.map((opt, oIdx) => (
+                              <label key={oIdx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', cursor: 'pointer', padding: '0.35rem 0.5rem', borderRadius: '4px', background: selectedVal === oIdx ? 'rgba(99,102,241,0.08)' : 'transparent', border: selectedVal === oIdx ? '1px solid #6366f1' : '1px solid transparent' }}>
+                                <input type="radio" name={`quiz-q-${qIdx}`} checked={selectedVal === oIdx} onChange={() => setQuizAnswers(prev => ({ ...prev, [qIdx]: oIdx }))} style={{ cursor: 'pointer' }} />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => { setActiveAssessmentQuiz(null); setQuizAnswers({}); }}>Cancel</button>
+                  <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0.6rem 2rem', backgroundColor: '#6366f1', border: 'none', color: '#FFF', cursor: 'pointer' }}
+                    disabled={questions.length > 0 && Object.keys(quizAnswers).length < questions.length}
+                    onClick={() => {
+                      let correct = 0;
+                      questions.forEach((item, qIdx) => {
+                        if (quizAnswers[qIdx] === item.answer) {
+                          correct++;
+                        }
+                      });
+                      const scoreVal = Math.round((correct / questions.length) * 100);
+                      
+                      // Update assessment state
+                      setCandidateAssessments(prev => prev.map(a => a.id === activeAssessmentQuiz.id ? { ...a, status: 'completed', score: scoreVal } : a));
+                      
+                      // Add notification
+                      const timeStr = 'Just now';
+                      const newNotification = {
+                        id: Math.random(),
+                        icon: '✅',
+                        title: 'Assessment Completed',
+                        body: `You completed the ${activeAssessmentQuiz.title} assessment with a score of ${scoreVal}/100.`,
+                        time: timeStr,
+                        unread: true
+                      };
+                      setCandidateNotifications(prev => [newNotification, ...prev]);
+                      
+                      // Alert
+                      alert(`Assessment submitted successfully! Score: ${scoreVal}% (${correct}/${questions.length} correct)`);
+                      
+                      // Clear
+                      setActiveAssessmentQuiz(null);
+                      setQuizAnswers({});
+                    }}>
+                    Submit Assessment
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AI Practice Prep Modal */}
+        {activePracticeTopic && (() => {
+          const practiceQuestions = {
+            1: "Explain the difference between functional components and class components in React, and how the React fiber architecture or reconciliation works.",
+            2: "How would you design a scalable notification service that can handle millions of push notifications per day with low latency?",
+            3: "What is the event loop in JavaScript, and what is the difference between interface and type in TypeScript?",
+            4: "Describe a conflict you had with a team member, how you resolved it, and what you learned from the experience."
+          };
+          const questionText = practiceQuestions[activePracticeTopic.id] || "Explain the concept of responsive web design, layout performance optimization, and custom CSS variables.";
+          
+          return (
+            <div className="modal-backdrop" style={{ zIndex: 10002 }}>
+              <div className="modal-content" style={{ width: '640px', padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem', maxHeight: '90vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#8b5cf6' }}>
+                    <Target size={20} /> Prep with AI: {activePracticeTopic.topic}
+                  </h3>
+                  <button type="button" className="btn-close" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => { setActivePracticeTopic(null); setPracticeAnswer(''); setPracticeFeedback(null); }}><X size={20} /></button>
+                </div>
+                <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>
+                  Difficulty: {activePracticeTopic.difficulty} · Simulating Real-time AI Evaluation
+                </div>
+                
+                <div style={{ background: 'var(--color-paper-light)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem' }}>
+                  <div style={{ fontWeight: '800', fontSize: '0.9rem', color: 'var(--color-ink-light)', marginBottom: '0.5rem' }}>Practice Question:</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 'bold', color: 'var(--color-ink)', lineHeight: 1.5 }}>
+                    {questionText}
+                  </div>
+                </div>
+
+                {!practiceFeedback ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label text-xs">Your Answer</label>
+                      <textarea className="input-textarea" style={{ minHeight: '160px', fontSize: '0.88rem' }}
+                        placeholder="Type your structured answer here (include key concepts, architectural terms, or behavioral techniques)..."
+                        value={practiceAnswer} onChange={e => setPracticeAnswer(e.target.value)} disabled={practiceLoading} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                      <button type="button" className="btn-secondary" onClick={() => { setActivePracticeTopic(null); setPracticeAnswer(''); }} disabled={practiceLoading}>Cancel</button>
+                      <button type="button" className="btn-primary" style={{ width: 'auto', padding: '0.6rem 2rem', backgroundColor: '#8b5cf6', border: 'none', color: '#FFF', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                        disabled={!practiceAnswer.trim() || practiceLoading}
+                        onClick={() => {
+                          setPracticeLoading(true);
+                          setTimeout(() => {
+                            setPracticeLoading(false);
+                            // Evaluate answer based on keywords
+                            const answerLower = practiceAnswer.toLowerCase();
+                            let score = 65;
+                            const strengths = [];
+                            const improvements = [];
+                            
+                            if (activePracticeTopic.id === 1) { // React
+                              const kw = ['state', 'props', 'hook', 'fiber', 'reconciliation', 'dom', 'render', 'lifecycle', 'virtual dom', 'functional', 'class', 'concurrent'];
+                              let matches = 0;
+                              kw.forEach(w => { if (answerLower.includes(w)) matches++; });
+                              score += Math.min(matches * 3, 30);
+                              
+                              if (answerLower.includes('fiber') || answerLower.includes('reconciliation')) {
+                                strengths.push("Strong explanation of the React Fiber architecture and the reconciliation engine.");
+                              } else {
+                                improvements.push("Consider mentioning Fiber, scheduling, and the diffing algorithm (reconciliation).");
+                              }
+                              if (answerLower.includes('hook') || answerLower.includes('state')) {
+                                strengths.push("Demonstrated understanding of state management and dynamic React hooks.");
+                              } else {
+                                improvements.push("Mention functional hooks (useState, useEffect) and how they preserve state between renders.");
+                              }
+                            } else if (activePracticeTopic.id === 2) { // System Design
+                              const kw = ['cache', 'queue', 'scale', 'database', 'latency', 'redis', 'kafka', 'pub/sub', 'rabbitmq', 'microservices', 'load balancer', 'cdn', 'rate limit'];
+                              let matches = 0;
+                              kw.forEach(w => { if (answerLower.includes(w)) matches++; });
+                              score += Math.min(matches * 3, 30);
+                              
+                              if (answerLower.includes('queue') || answerLower.includes('kafka') || answerLower.includes('pub') || answerLower.includes('rabbitmq')) {
+                                strengths.push("Correctly leveraged message brokers (e.g. Kafka, RabbitMQ) to decouple notification triggers.");
+                              } else {
+                                improvements.push("Add a message queue or pub/sub layer to handle high load peaks asynchronously.");
+                              }
+                              if (answerLower.includes('cache') || answerLower.includes('redis')) {
+                                strengths.push("Good inclusion of in-memory caching (Redis) for rapid template and user preference access.");
+                              } else {
+                                improvements.push("Utilize caching mechanisms to prevent database bottlenecks during massive spikes.");
+                              }
+                            } else if (activePracticeTopic.id === 3) { // JS / TS
+                              const kw = ['event loop', 'call stack', 'callback', 'promise', 'async', 'interface', 'type', 'union', 'extend', 'prototype', 'microtask', 'macrotask'];
+                              let matches = 0;
+                              kw.forEach(w => { if (answerLower.includes(w)) matches++; });
+                              score += Math.min(matches * 3, 30);
+                              
+                              if (answerLower.includes('event loop') || answerLower.includes('stack') || answerLower.includes('queue')) {
+                                strengths.push("Clear description of call stack execution and the task queuing mechanism.");
+                              } else {
+                                improvements.push("Detail how the event loop checks the call stack and dequeues callback tasks.");
+                              }
+                              if (answerLower.includes('interface') && answerLower.includes('type')) {
+                                strengths.push("Understood key TS differences (e.g. declaration merging in interfaces vs union types).");
+                              } else {
+                                improvements.push("Highlight that interfaces support declaration merging, whereas types can represent unions and intersections.");
+                              }
+                            } else { // Behavioral / HR or fallback
+                              const kw = ['star', 'situation', 'task', 'action', 'result', 'communicate', 'resolve', 'feedback', 'team', 'listen', 'collaborate', 'lead'];
+                              let matches = 0;
+                              kw.forEach(w => { if (answerLower.includes(w)) matches++; });
+                              score += Math.min(matches * 3, 30);
+                              
+                              if (answerLower.includes('result') || answerLower.includes('action')) {
+                                strengths.push("Structured narrative using action-oriented steps and clear final results.");
+                              } else {
+                                improvements.push("Use the STAR framework (Situation, Task, Action, Result) to format your answers.");
+                              }
+                              if (answerLower.includes('communicate') || answerLower.includes('listen') || answerLower.includes('resolve')) {
+                                strengths.push("Emphasized collaborative communication and constructive resolution paths.");
+                              }
+                            }
+                            
+                            if (strengths.length === 0) strengths.push("Completed response with general domain knowledge.");
+                            if (improvements.length === 0) improvements.push("Elaborate further with specific architectural or design patterns to stand out.");
+
+                            setPracticeFeedback({
+                              score,
+                              strengths,
+                              improvements
+                            });
+                          }, 1200);
+                        }}>
+                        {practiceLoading ? 'Evaluating with AI...' : 'Submit Answer for Review'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', animation: 'fadeIn 0.25s' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--color-paper-light)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#8b5cf620', color: '#8b5cf6', width: '60px', height: '60px', borderRadius: '30px', fontSize: '1.25rem', fontWeight: '800', flexShrink: 0 }}>
+                        {practiceFeedback.score}%
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '800', fontSize: '1rem', color: 'var(--color-ink)' }}>AI Evaluation Complete</div>
+                        <div className="cp-app-date">Score based on depth of content, terminology, and structure.</div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ background: '#10b98110', border: '1px solid #10b98130', borderRadius: '8px', padding: '1rem' }}>
+                      <div style={{ fontWeight: '800', color: '#10b981', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Key Strengths</div>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: 'var(--color-ink-light)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {practiceFeedback.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </div>
+
+                    <div style={{ background: '#f59e0b10', border: '1px solid #f59e0b30', borderRadius: '8px', padding: '1rem' }}>
+                      <div style={{ fontWeight: '800', color: '#f59e0b', fontSize: '0.85rem', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Areas of Improvement</div>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: 'var(--color-ink-light)', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        {practiceFeedback.improvements.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                      <button className="btn-secondary" onClick={() => setPracticeFeedback(null)}>Practice Again</button>
+                      <button className="cp-action-btn" style={{ width: 'auto', padding: '0.5rem 1.5rem', background: '#8b5cf6' }} onClick={() => { setActivePracticeTopic(null); setPracticeAnswer(''); setPracticeFeedback(null); }}>Complete Topic</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Messages Chat Dialog Modal */}
+        {activeChatMsg && (
+          <div className="modal-backdrop" style={{ zIndex: 10002 }}>
+            <div className="modal-content" style={{ width: '560px', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '90vh' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div className="cp-msg-avatar" style={{ background: activeChatMsg.color, width: '40px', height: '40px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', color: '#fff', fontWeight: 'bold' }}>
+                    {activeChatMsg.avatar}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '800', fontSize: '0.95rem', color: 'var(--color-ink)' }}>{activeChatMsg.from}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>{activeChatMsg.role}</div>
+                  </div>
+                </div>
+                <button type="button" className="btn-close" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => setActiveChatMsg(null)}><X size={20} /></button>
+              </div>
+
+              <div className="cp-chat-messages" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.85rem', flex: 1, padding: '0.5rem 0' }}>
+                {activeChatMsg.chatHistory && activeChatMsg.chatHistory.map((m, idx) => {
+                  const isUser = m.sender === 'user';
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start', margin: '0.2rem 0' }}>
+                      <div style={{
+                        maxWidth: '75%',
+                        padding: '0.65rem 0.95rem',
+                        fontSize: '0.85rem',
+                        borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                        background: isUser ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'var(--color-paper-light)',
+                        color: isUser ? '#fff' : 'var(--color-ink)',
+                        border: isUser ? 'none' : '1px solid var(--color-border)',
+                        lineHeight: 1.4
+                      }}>
+                        {m.text}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.75rem' }}>
+                <input type="text" className="input-text" style={{ flex: 1, margin: 0, padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                  placeholder="Type a message..."
+                  value={newMessageText}
+                  onChange={e => setNewMessageText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newMessageText.trim()) {
+                      const userTxt = newMessageText.trim();
+                      const nextHist = [...(activeChatMsg.chatHistory || []), { sender: 'user', text: userTxt }];
+                      
+                      // Update modal active message state
+                      setActiveChatMsg(prev => ({ ...prev, chatHistory: nextHist, preview: userTxt }));
+                      // Update central state
+                      setCandidateMessages(prev => prev.map(msg => msg.id === activeChatMsg.id ? { ...msg, chatHistory: nextHist, preview: userTxt } : msg));
+                      setNewMessageText('');
+                      
+                      // Auto response trigger
+                      setTimeout(() => {
+                        const autoReplies = {
+                          1: ["Thanks for the update! I have scheduled your interview for Friday at 3:00 PM.", "Perfect, I will confirm with the hiring manager and get back to you."],
+                          2: ["That makes sense. Can you also talk about how you manage shared state across micro-frontends?", "Great. We will send you an invite for the Zoom meeting shortly."],
+                          3: ["Thanks for reaching out! We are currently finalizing the schedules and will let you know by next week."],
+                          4: ["This is an automated system broadcast. Please check your notifications for updates."]
+                        };
+                        const replies = autoReplies[activeChatMsg.id] || ["Thanks for your response. We will get back to you soon!"];
+                        const autoReplyText = replies[Math.floor(Math.random() * replies.length)];
+                        
+                        setCandidateMessages(prev => prev.map(msg => {
+                          if (msg.id === activeChatMsg.id) {
+                            return { ...msg, chatHistory: [...msg.chatHistory, { sender: 'them', text: autoReplyText }], preview: autoReplyText };
+                          }
+                          return msg;
+                        }));
+                        setActiveChatMsg(prev => {
+                          if (prev && prev.id === activeChatMsg.id) {
+                            return { ...prev, chatHistory: [...(prev.chatHistory || []), { sender: 'them', text: autoReplyText }], preview: autoReplyText };
+                          }
+                          return prev;
+                        });
+                      }, 1500);
+                    }
+                  }} />
+                <button className="cp-action-btn" style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                  disabled={!newMessageText.trim()}
+                  onClick={() => {
+                    const userTxt = newMessageText.trim();
+                    const nextHist = [...(activeChatMsg.chatHistory || []), { sender: 'user', text: userTxt }];
+                    
+                    setActiveChatMsg(prev => ({ ...prev, chatHistory: nextHist, preview: userTxt }));
+                    setCandidateMessages(prev => prev.map(msg => msg.id === activeChatMsg.id ? { ...msg, chatHistory: nextHist, preview: userTxt } : msg));
+                    setNewMessageText('');
+                    
+                    setTimeout(() => {
+                      const autoReplies = {
+                        1: ["Thanks for the update! I have scheduled your interview for Friday at 3:00 PM.", "Perfect, I will confirm with the hiring manager and get back to you."],
+                        2: ["That makes sense. Can you also talk about how you manage shared state across micro-frontends?", "Great. We will send you an invite for the Zoom meeting shortly."],
+                        3: ["Thanks for reaching out! We are currently finalizing the schedules and will let you know by next week."],
+                        4: ["This is an automated system broadcast. Please check your notifications for updates."]
+                      };
+                      const replies = autoReplies[activeChatMsg.id] || ["Thanks for your response. We will get back to you soon!"];
+                      const autoReplyText = replies[Math.floor(Math.random() * replies.length)];
+                      
+                      setCandidateMessages(prev => prev.map(msg => {
+                        if (msg.id === activeChatMsg.id) {
+                          return { ...msg, chatHistory: [...msg.chatHistory, { sender: 'them', text: autoReplyText }], preview: autoReplyText };
+                        }
+                        return msg;
+                      }));
+                      setActiveChatMsg(prev => {
+                        if (prev && prev.id === activeChatMsg.id) {
+                          return { ...prev, chatHistory: [...(prev.chatHistory || []), { sender: 'them', text: autoReplyText }], preview: autoReplyText };
+                        }
+                        return prev;
+                      });
+                    }, 1500);
+                  }}>
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -6064,7 +6803,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
   const renderLoginScreen = () => {
     const isCandidate = loginRole === 'candidate';
-    const isRegister = loginMode === 'register' && isCandidate;
+    const isRegister = loginMode === 'register';
 
     return (
       <div className="auth-container">
@@ -6119,27 +6858,25 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             </div>
           </div>
 
-          {/* Login / Register Tabs (Candidate only) */}
-          {isCandidate && (
-            <div className="auth-mode-tabs">
-              <button
-                type="button"
-                className={`auth-mode-tab ${loginMode === 'login' ? 'active' : ''}`}
-                onClick={() => { setLoginMode('login'); setLoginError(null); }}
-                disabled={isSigningIn}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                className={`auth-mode-tab ${loginMode === 'register' ? 'active' : ''}`}
-                onClick={() => { setLoginMode('register'); setLoginError(null); }}
-                disabled={isSigningIn}
-              >
-                Create Account
-              </button>
-            </div>
-          )}
+          {/* Login / Register Tabs (Always Available) */}
+          <div className="auth-mode-tabs">
+            <button
+              type="button"
+              className={`auth-mode-tab ${loginMode === 'login' ? 'active' : ''}`}
+              onClick={() => { setLoginMode('login'); setLoginError(null); }}
+              disabled={isSigningIn}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              className={`auth-mode-tab ${loginMode === 'register' ? 'active' : ''}`}
+              onClick={() => { setLoginMode('register'); setLoginError(null); }}
+              disabled={isSigningIn}
+            >
+              Create Account
+            </button>
+          </div>
 
           {loginError && (
             <div className="auth-error-banner">
@@ -6157,7 +6894,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   id="email-input"
                   type="email"
                   className="auth-input"
-                  placeholder={isCandidate ? 'you@example.com' : 'admink338@gmail.com'}
+                  placeholder={isCandidate ? 'you@example.com' : 'recruiter@example.com'}
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   disabled={isSigningIn}
@@ -6204,30 +6941,28 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   <span>{isRegister ? 'Creating Account...' : 'Signing In...'}</span>
                 </>
               ) : (
-                <span>{isRegister ? '🚀 Create Candidate Account' : isCandidate ? '🔑 Sign In to Candidate Portal' : '🏢 Admin Sign In'}</span>
+                <span>{isRegister ? (isCandidate ? '🚀 Create Candidate Account' : '🏢 Create Recruiter Account') : isCandidate ? '🔑 Sign In to Candidate Portal' : '🏢 Recruiter Sign In'}</span>
               )}
             </button>
           </form>
 
-          {!isCandidate && (
+          {!isCandidate && loginMode === 'login' && (
             <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.4)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: '8px', fontSize: '0.75rem', color: 'var(--color-ink-muted)', textAlign: 'center' }}>
               <strong style={{ color: 'var(--color-ink-light)' }}>Authorized Access Only</strong><br />Please sign in using your recruiter coordinates.
             </div>
           )}
 
-          {isCandidate && (
-            <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
-              {loginMode === 'login' ? (
-                <>Don't have an account?{' '}
-                  <button type="button" onClick={() => setLoginMode('register')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Create one free →</button>
-                </>
-              ) : (
-                <>Already registered?{' '}
-                  <button type="button" onClick={() => setLoginMode('login')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Sign in instead →</button>
-                </>
-              )}
-            </div>
-          )}
+          <div style={{ marginTop: '1.25rem', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
+            {loginMode === 'login' ? (
+              <>Don't have an account?{' '}
+                <button type="button" onClick={() => setLoginMode('register')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Create one free →</button>
+              </>
+            ) : (
+              <>Already registered?{' '}
+                <button type="button" onClick={() => setLoginMode('login')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Sign in instead →</button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -6276,8 +7011,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <div className="user-name" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
               {session?.user?.email ? session.user.email.split('@')[0] : 'Admin Recruiter'}
             </div>
-            <div className="user-role" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={session?.user?.email || 'admink338@gmail.com'}>
-              {session?.user?.email || 'admink338@gmail.com'}
+            <div className="user-role" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={userRole === 'admin' ? 'HR Recruiter' : 'Job Candidate'}>
+              {userRole === 'admin' ? 'HR Recruiter' : 'Job Candidate'}
             </div>
           </div>
           <button 
@@ -8957,7 +9692,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
     return renderLoginScreen();
   }
 
-  if (session.user.email !== 'admink338@gmail.com') {
+  if (userRole !== 'admin') {
     try {
       return renderCandidateDashboard();
     } catch (err) {
