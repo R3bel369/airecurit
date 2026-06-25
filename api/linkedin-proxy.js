@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   // CORS Headers so the client-side app can access it
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Restli-Protocol-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Restli-Protocol-Version, LinkedIn-Version');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -28,12 +28,18 @@ export default async function handler(req, res) {
 
     const authHeader = req.headers.authorization;
     const protocolVersion = req.headers['x-restli-protocol-version'];
+    const linkedinVersion = req.headers['linkedin-version'];
 
     const headers = {
       'Content-Type': 'application/json'
     };
     if (authHeader) headers.Authorization = authHeader;
     if (protocolVersion) headers['X-Restli-Protocol-Version'] = protocolVersion;
+    if (linkedinVersion) {
+      headers['LinkedIn-Version'] = linkedinVersion;
+    } else if (urlPath.includes('rest/')) {
+      headers['LinkedIn-Version'] = '202603';
+    }
 
     const fetchOptions = {
       method: req.method,

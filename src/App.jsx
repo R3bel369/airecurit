@@ -1403,7 +1403,13 @@ Requirements:
   };
 
   const getLinkedInApiUrl = (path) => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || 
+                    hostname === '127.0.0.1' || 
+                    hostname.startsWith('192.168.') || 
+                    hostname.startsWith('10.') || 
+                    hostname.startsWith('172.') || 
+                    window.location.port === '5173';
     if (isLocal) {
       return `/linkedin-api/${path}`;
     } else {
@@ -8357,34 +8363,43 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
   const publishToLinkedInFeed = async (token, personId, text) => {
     try {
-      const res = await fetch(getLinkedInApiUrl('v2/ugcShares'), {
+      const res = await fetch(getLinkedInApiUrl('rest/posts'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0'
+          'X-Restli-Protocol-Version': '2.0.0',
+          'LinkedIn-Version': '202603'
         },
         body: JSON.stringify({
           "author": `urn:li:person:${personId}`,
-          "lifecycleState": "PUBLISHED",
-          "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-              "shareCommentary": {
-                "text": text
-              },
-              "shareMediaCategory": "NONE"
-            }
+          "commentary": text,
+          "visibility": "PUBLIC",
+          "distribution": {
+            "feedDistribution": "MAIN_FEED"
           },
-          "visibility": {
-            "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-          }
+          "lifecycleState": "PUBLISHED"
         })
       });
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`[HTTP ${res.status}] ${res.statusText || 'Error'}: ${errText}`);
       }
-      const data = await res.json();
+      // LinkedIn Posts API returns 201 Created with an empty body
+      let data = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const resText = await res.text();
+        if (resText) {
+          try {
+            data = JSON.parse(resText);
+          } catch (e) {
+            data = { message: resText };
+          }
+        }
+      }
       return data;
     } catch (e) {
       if (e.message.includes('Failed to fetch')) {
