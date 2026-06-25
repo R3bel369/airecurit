@@ -1858,7 +1858,7 @@ Requirements:
       } else {
         // Initialize clean state for a new candidate
         setCandidateProfileData({
-          fullName: session.user.email.split('@')[0],
+          fullName: (session?.user?.email || 'Candidate').split('@')[0],
           phone: '',
           location: '',
           headline: '',
@@ -5221,10 +5221,11 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       e.preventDefault();
       if (!selectedJobForApplication || !candidateAppliedText.trim()) return;
 
+      const userEmail = session?.user?.email || 'candidate@example.com';
       const candidateId = 'portal-' + Math.random().toString(36).substring(7);
-      const text = `${session.user.email.split('@')[0]}\nEmail: ${session.user.email}\n\nResume Details:\n${candidateAppliedText}`;
+      const text = `${userEmail.split('@')[0]}\nEmail: ${userEmail}\n\nResume Details:\n${candidateAppliedText}`;
       const tempCand = {
-        id: candidateId, name: session.user.email.split('@')[0], text,
+        id: candidateId, name: userEmail.split('@')[0], text,
         noticePeriod: null, currentCtc: null, expectedCtc: null, location: null,
         preferredLocation: null, resumeQuality: null, scorecard: null, activityLog: null
       };
@@ -5236,7 +5237,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         hr: { technical: 3, communication: 3, problemSolving: 3, cultureFit: 3, notes: "Awaiting HR round." }
       };
       const newCandidate = {
-        id: candidateId, name: session.user.email.split('@')[0],
+        id: candidateId, name: userEmail.split('@')[0],
         fileName: `${selectedJobForApplication.title.replace(/\s+/g, '_')}_Resume.txt`,
         fileSize: candidateAppliedText.length, status: 'completed', ocrProgress: 0, text,
         numChars: candidateAppliedText.length, errorDetails: '', score: evalData.calculatedScore,
@@ -5266,9 +5267,9 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       alert(`🎉 Application submitted for ${selectedJobForApplication.title}! ATS Score: ${evalData.calculatedScore}%`);
     };
 
-    const userName = session.user.email.split('@')[0];
+    const userName = (session?.user?.email || 'candidate@example.com').split('@')[0];
     const displayName = userName.charAt(0).toUpperCase() + userName.slice(1);
-    const candidateApplications = candidates.filter(c => extractEmail(c).toLowerCase() === session.user.email.toLowerCase());
+    const candidateApplications = candidates.filter(c => extractEmail(c).toLowerCase() === (session?.user?.email || 'candidate@example.com').toLowerCase());
 
     const dummyInterviews = candidateApplications.flatMap(c => {
       const jIds = Object.keys(c.jobsData || {});
