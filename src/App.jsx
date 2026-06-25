@@ -803,9 +803,13 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      if (supabaseStatus !== 'offline') {
+        await supabase.auth.signOut();
+      }
     } catch (err) {
       console.error('Logout error:', err);
+    } finally {
+      setSession(null);
     }
   };
 
@@ -7010,6 +7014,56 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
               {supabaseStatus === 'connected' ? 'Connected' : supabaseStatus === 'schema_missing' ? 'Tables Missing' : supabaseStatus === 'connecting' ? 'Connecting...' : 'Connection Error'}
             </strong>
           </div>
+
+          {/* Offline Demo Mode Bypass */}
+          {supabaseStatus !== 'connected' && (
+            <button
+              type="button"
+              className="auth-btn-submit"
+              style={{
+                marginTop: '0.75rem',
+                fontSize: '0.75rem',
+                padding: '0.45rem',
+                borderRadius: '6px',
+                border: '1px dashed var(--color-border)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                color: 'var(--color-ink-light)',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.25rem',
+                width: '100%'
+              }}
+              onClick={() => {
+                setSupabaseStatus('offline');
+                setSession({
+                  user: {
+                    id: 'offline-demo-id',
+                    email: loginRole === 'admin' ? 'admink338@gmail.com' : 'software3369@gmail.com',
+                    user_metadata: {
+                      role: loginRole,
+                      candidateProfileData: {
+                        fullName: loginRole === 'admin' ? 'Admin Recruiter' : 'Rohan Mehta',
+                        phone: '1234567890',
+                        location: 'Bangalore',
+                        headline: 'Lead Software Engineer',
+                        skills: 'React, TypeScript, Redux',
+                        education: 'BTech CS',
+                        experience: '5 Years',
+                        bio: 'Offline fallback demo user.',
+                        avatarUrl: ''
+                      }
+                    }
+                  }
+                });
+                setLoginError(null);
+              }}
+            >
+              🚀 Enter Offline Demo Mode
+            </button>
+          )}
         </div>
       </div>
     );
