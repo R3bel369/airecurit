@@ -725,7 +725,11 @@ export default function App() {
           }
         });
         if (error) {
-          setLoginError(error.message || 'Registration failed. Try a different email.');
+          if (error.message?.toLowerCase().includes('already registered') || error.message?.toLowerCase().includes('already exists')) {
+            setLoginError('An account with this email address already exists. Please sign in instead.');
+          } else {
+            setLoginError(error.message || 'Registration failed. Try a different email.');
+          }
         } else if (data.session) {
           // Email confirmation disabled — logged in immediately
           setSession(data.session);
@@ -766,7 +770,13 @@ export default function App() {
           password: loginPassword,
         });
         if (error) {
-          setLoginError(error.message || 'Invalid login credentials.');
+          if (error.message?.toLowerCase().includes('email not confirmed')) {
+            setLoginError('Your email address is not confirmed yet. Please verify your email by clicking the confirmation link sent to your inbox.');
+          } else if (error.message?.toLowerCase().includes('invalid login credentials')) {
+            setLoginError('Invalid email or password. Please verify your credentials and try again.');
+          } else {
+            setLoginError(error.message || 'Invalid login credentials.');
+          }
         } else {
           const signedInUser = data.user;
           const actualRole = signedInUser?.user_metadata?.role || (signedInUser?.email === 'admink338@gmail.com' ? 'admin' : 'candidate');
@@ -6880,9 +6890,28 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           </div>
 
           {loginError && (
-            <div className="auth-error-banner">
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{loginError}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <div className="auth-error-banner" style={{ marginBottom: 0 }}>
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{loginError}</span>
+              </div>
+              <div style={{ 
+                padding: '0.75rem', 
+                background: 'rgba(239, 68, 68, 0.05)', 
+                border: '1px solid rgba(239, 68, 68, 0.15)', 
+                borderRadius: '6px', 
+                fontSize: '0.72rem', 
+                color: 'var(--color-ink-muted)',
+                textAlign: 'left'
+              }}>
+                <strong style={{ color: '#ef4444', display: 'block', marginBottom: '0.25rem' }}>Troubleshooting Tips:</strong>
+                <ul style={{ paddingLeft: '1.1rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  <li>Make sure you have selected the correct tab above (<strong>Job Candidate</strong> or <strong>HR Recruiter</strong>).</li>
+                  <li>Verify that your email and password are correct.</li>
+                  <li>If this is a new account, check your email inbox (including spam) for a verification link to confirm your email.</li>
+                  <li>HR Recruiter accounts must be registered with the recruiter role.</li>
+                </ul>
+              </div>
             </div>
           )}
 
@@ -6963,6 +6992,23 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 <button type="button" onClick={() => setLoginMode('login')} style={{ background: 'none', border: 'none', color: '#8b5cf6', fontWeight: '700', cursor: 'pointer', fontSize: 'inherit', textDecoration: 'underline' }}>Sign in instead →</button>
               </>
             )}
+          </div>
+
+          {/* Database Connectivity Indicator */}
+          <div style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.7rem', color: 'var(--color-ink-muted)' }}>
+            <span style={{ 
+              width: '8px', 
+              height: '8px', 
+              borderRadius: '50%', 
+              backgroundColor: supabaseStatus === 'connected' ? '#10b981' : supabaseStatus === 'schema_missing' ? '#f59e0b' : '#ef4444', 
+              display: 'inline-block' 
+            }} />
+            <span>Supabase Database: </span>
+            <strong style={{ 
+              color: supabaseStatus === 'connected' ? 'var(--color-sage)' : supabaseStatus === 'schema_missing' ? '#f59e0b' : '#ef4444' 
+            }}>
+              {supabaseStatus === 'connected' ? 'Connected' : supabaseStatus === 'schema_missing' ? 'Tables Missing' : supabaseStatus === 'connecting' ? 'Connecting...' : 'Connection Error'}
+            </strong>
           </div>
         </div>
       </div>
