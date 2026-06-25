@@ -1402,10 +1402,19 @@ Requirements:
     return base64urlencode(hashed);
   };
 
+  const getLinkedInApiUrl = (path) => {
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+      return `/linkedin-api/${path}`;
+    } else {
+      return `/api/linkedin-proxy?path=${encodeURIComponent(path)}`;
+    }
+  };
+
   const fetchLinkedInProfileDetails = async (token) => {
     // Try OpenID Connect /v2/userinfo first, as it is standard for modern apps
     try {
-      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/userinfo', {
+      const res = await fetch(getLinkedInApiUrl('v2/userinfo'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -1431,7 +1440,7 @@ Requirements:
 
     // Fallback to /v2/me
     try {
-      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/me', {
+      const res = await fetch(getLinkedInApiUrl('v2/me'), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'X-Restli-Protocol-Version': '2.0.0'
@@ -8348,7 +8357,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
 
   const publishToLinkedInFeed = async (token, personId, text) => {
     try {
-      const res = await fetch('https://corsproxy.io/?https://api.linkedin.com/v2/ugcShares', {
+      const res = await fetch(getLinkedInApiUrl('v2/ugcShares'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
