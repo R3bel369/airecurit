@@ -1,11 +1,11 @@
 /**
- * Vercel Serverless Function: LinkedIn Token Exchange
+ * Vercel Serverless Function: Indeed Token Exchange
  * 
  * Handles the OAuth 2.0 authorization code → access token exchange server-side.
  * This avoids CORS restrictions since the call is made from Node.js, not the browser.
  * 
- * POST /api/linkedin-token
- * Body: { code, redirect_uri, client_id, client_secret, code_verifier? }
+ * POST /api/indeed-token
+ * Body: { code, redirect_uri, client_id, client_secret }
  */
 export default async function handler(req, res) {
   // CORS headers so the browser can call this endpoint
@@ -23,7 +23,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { code, redirect_uri, client_id, client_secret, code_verifier } = req.body;
+    const { code, redirect_uri } = req.body;
+    const client_id = req.body.client_id || process.env.INDEED_CLIENT_ID;
+    const client_secret = req.body.client_secret || process.env.INDEED_CLIENT_SECRET;
 
     if (!code || !redirect_uri || !client_id || !client_secret) {
       return res.status(400).json({
@@ -40,24 +42,21 @@ export default async function handler(req, res) {
       client_secret
     };
 
-    if (code_verifier) {
-      bodyParams.code_verifier = code_verifier;
-    }
-
-    const tokenResponse = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+    const tokenResponse = await fetch('https://profile.indeed.com/oauth/v2/tokens', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
       },
       body: new URLSearchParams(bodyParams).toString()
     });
 
     const data = await tokenResponse.json();
 
-    // Forward LinkedIn's response status and body
+    // Forward Indeed's response status and body
     return res.status(tokenResponse.status).json(data);
   } catch (err) {
-    console.error('LinkedIn token exchange error:', err);
+    console.error('Indeed token exchange error:', err);
     return res.status(500).json({
       error: 'server_error',
       error_description: err.message || 'Internal server error during token exchange.'

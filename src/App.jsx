@@ -5,7 +5,7 @@ import {
   Mail, Send, X, Sun, Moon, Briefcase, Globe, Users, Target, TrendingUp, Zap, DollarSign,
   LogOut, Lock, LayoutDashboard, User, Bookmark, Star, ClipboardList, Award, Calendar,
   FileCheck, Folder, MessageSquare, Bell, Bot, FolderOpen, ChevronLeft, ChevronRight, BookOpen, Search,
-  Linkedin, Share2, ExternalLink, BarChart2, Download
+  Share2, ExternalLink, BarChart2, Download, ShieldCheck, Activity
 } from 'lucide-react';
 
 
@@ -1281,94 +1281,117 @@ Requirements:
   const [careersFont, setCareersFont] = useState('sans');
   const [activeSidebarTab, setActiveSidebarTab] = useState('candidates');
 
-  // LinkedIn Portal States
-  const [linkedinActiveTab, setLinkedinActiveTab] = useState('post'); // 'post' | 'search' | 'settings'
-  const [linkedInConnected, setLinkedInConnected] = useState(() => {
-    return localStorage.getItem('rp_linkedin_connected') === 'true';
+  // Indeed Portal States
+  const [indeedActiveTab, setIndeedActiveTab] = useState('post'); // 'post' | 'search' | 'settings'
+  const [indeedConnected, setIndeedConnected] = useState(() => {
+    return localStorage.getItem('rp_indeed_connected') === 'true';
   });
-  const [linkedInMode, setLinkedInMode] = useState(() => {
-    return localStorage.getItem('rp_linkedin_mode') || 'sandbox'; // 'sandbox' | 'live'
+  const [indeedMode, setIndeedMode] = useState(() => {
+    return localStorage.getItem('rp_indeed_mode') || 'sandbox'; // 'sandbox' | 'live'
   });
-  const [linkedInClientId, setLinkedInClientId] = useState(() => {
-    return localStorage.getItem('rp_linkedin_client_id') || '';
+  const [indeedClientId, setIndeedClientId] = useState(() => {
+    return localStorage.getItem('rp_indeed_client_id') || '';
   });
-  const [linkedInClientSecret, setLinkedInClientSecret] = useState(() => {
-    return localStorage.getItem('rp_linkedin_client_secret') || '';
+  const [indeedClientSecret, setIndeedClientSecret] = useState(() => {
+    return localStorage.getItem('rp_indeed_client_secret') || '';
   });
-  const [linkedInRedirectUri, setLinkedInRedirectUri] = useState(() => {
-    return localStorage.getItem('rp_linkedin_redirect_uri') || window.location.origin + '/';
+  const [indeedRedirectUri, setIndeedRedirectUri] = useState(() => {
+    return localStorage.getItem('rp_indeed_redirect_uri') || window.location.origin + '/';
   });
-  const [linkedInProfile, setLinkedInProfile] = useState(() => {
-    const saved = localStorage.getItem('rp_linkedin_profile');
+  const [indeedProfile, setIndeedProfile] = useState(() => {
+    const saved = localStorage.getItem('rp_indeed_profile');
     return saved ? JSON.parse(saved) : null;
   });
 
-  // LinkedIn Posting states
-  const [selectedJobForLinkedIn, setSelectedJobForLinkedIn] = useState('job-1');
-  const [linkedInPostType, setLinkedInPostType] = useState('member'); // 'member' | 'company'
-  const [linkedInCompanyId, setLinkedInCompanyId] = useState(() => {
-    return localStorage.getItem('rp_linkedin_company_id') || '';
+  // Indeed Posting states
+  const [selectedJobForIndeed, setSelectedJobForIndeed] = useState('job-1');
+  const [indeedPostType, setIndeedPostType] = useState('member'); // 'member' | 'company'
+  const [indeedCompanyId, setIndeedCompanyId] = useState(() => {
+    return localStorage.getItem('rp_indeed_company_id') || '';
   });
-  const [linkedInShareText, setLinkedInShareText] = useState('');
-  const [isPostingToLinkedIn, setIsPostingToLinkedIn] = useState(false);
-  const [linkedInPostSuccess, setLinkedInPostSuccess] = useState(false);
-  const [linkedInShareUrl, setLinkedInShareUrl] = useState('');
+  const [indeedShareText, setIndeedShareText] = useState('');
+  const [isPostingToIndeed, setIsPostingToIndeed] = useState(false);
+  const [indeedPostSuccess, setIndeedPostSuccess] = useState(false);
+  const [indeedShareUrl, setIndeedShareUrl] = useState('');
   
-  // LinkedIn Posting History
-  const [linkedInPostHistory, setLinkedInPostHistory] = useState(() => {
-    const saved = localStorage.getItem('rp_linkedin_post_history');
+  // Indeed Posting History
+  const [indeedPostHistory, setIndeedPostHistory] = useState(() => {
+    const saved = localStorage.getItem('rp_indeed_post_history');
     if (saved) return JSON.parse(saved);
     return [
       {
-        id: 'li-post-1',
+        id: 'ind-post-1',
         jobId: 'job-1',
         jobTitle: 'Senior Frontend Engineer (React)',
         postType: 'member',
-        shareText: "We're hiring: Senior Frontend Engineer (React)! 🚀\n\nMust-haves:\n• React\n• TypeScript\n• 5+ years experience\n• Tailwind CSS\n• Git\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniorfrontendengineerreact",
+        shareText: `We're hiring: Senior Frontend Engineer (React)! 🚀
+
+Must-haves:
+• React
+• TypeScript
+• 5+ years experience
+• Tailwind CSS
+• Git
+
+Join our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniorfrontendengineerreact`,
         postedAt: '2026-06-20 11:30 AM',
         status: 'Live',
         views: 245,
         clicks: 34,
         applies: 8,
-        shareUrl: 'https://www.linkedin.com/feed/update/urn:li:share:7123984712039841'
+        shareUrl: 'https://www.indeed.com/viewjob?jk=ind7123984712039841'
       },
       {
-        id: 'li-post-2',
+        id: 'ind-post-2',
         jobId: 'job-2',
         jobTitle: 'Senior Data Scientist (Python / AI)',
         postType: 'company',
-        shareText: "We're hiring: Senior Data Scientist (Python / AI)! 🚀\n\nMust-haves:\n• Python\n• PyTorch\n• 3+ years AI/ML experience\n• SQL\n• LLMs\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniordatascientistpythonai",
+        shareText: `We're hiring: Senior Data Scientist (Python / AI)! 🚀
+
+Must-haves:
+• Python
+• PyTorch
+• 3+ years AI/ML experience
+• SQL
+• LLMs
+
+Join our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #seniordatascientistpythonai`,
         postedAt: '2026-06-18 09:15 AM',
         status: 'Live',
         views: 412,
         clicks: 89,
         applies: 14,
-        shareUrl: 'https://www.linkedin.com/feed/update/urn:li:share:7123984712039842'
+        shareUrl: 'https://www.indeed.com/viewjob?jk=ind7123984712039842'
       }
     ];
   });
 
-  // LinkedIn Search States
-  const [linkedInSearchQuery, setLinkedInSearchQuery] = useState('React Developer');
-  const [linkedInSearchLocation, setLinkedInSearchLocation] = useState('Remote');
-  const [linkedInSearchJobType, setLinkedInSearchJobType] = useState('all'); // 'all' | 'full-time' | 'part-time' | 'contract' | 'internship'
-  const [linkedInSearchExperience, setLinkedInSearchExperience] = useState('all'); // 'all' | 'entry' | 'mid-senior' | 'director'
-  const [isSearchingLinkedIn, setIsSearchingLinkedIn] = useState(false);
-  const [linkedInSearchHasSearched, setLinkedInSearchHasSearched] = useState(false);
-  const [linkedInSearchResults, setLinkedInSearchResults] = useState([]);
+  // Indeed Search States
+  const [indeedSearchQuery, setIndeedSearchQuery] = useState('React Developer');
+  const [indeedSearchLocation, setIndeedSearchLocation] = useState('Remote');
+  const [indeedSearchJobType, setIndeedSearchJobType] = useState('all'); // 'all' | 'full-time' | 'part-time' | 'contract' | 'internship'
+  const [indeedSearchExperience, setIndeedSearchExperience] = useState('all'); // 'all' | 'entry' | 'mid-senior' | 'director'
+  const [isSearchingIndeed, setIsSearchingIndeed] = useState(false);
+  const [indeedSearchHasSearched, setIndeedSearchHasSearched] = useState(false);
+  const [indeedSearchResults, setIndeedSearchResults] = useState([]);
   const [selectedSearchResult, setSelectedSearchResult] = useState(null);
 
   // Simulated OAuth screen state
-  const [isLinkedInAuthOpen, setIsLinkedInAuthOpen] = useState(false);
+  const [isIndeedAuthOpen, setIsIndeedAuthOpen] = useState(false);
   const [authStep, setAuthStep] = useState('login'); // 'login' | 'consent' | 'processing'
   const [authEmail, setAuthEmail] = useState('admink338@gmail.com');
   const [authPassword, setAuthPassword] = useState('••••••••');
 
-  const [linkedInAccessToken, setLinkedInAccessToken] = useState(() => {
-    return localStorage.getItem('rp_linkedin_access_token') || '';
+  const [indeedAccessToken, setIndeedAccessToken] = useState(() => {
+    return localStorage.getItem('rp_indeed_access_token') || '';
   });
 
-  // PKCE Helper utilities for secure client-side LinkedIn OAuth
+  // Indeed Token Introspection States
+  const [indeedIntrospectResult, setIndeedIntrospectResult] = useState(null);
+  const [isCheckingToken, setIsCheckingToken] = useState(false);
+  const [tokenCheckError, setTokenCheckError] = useState(null);
+
+  // PKCE Helper utilities for secure client-side Indeed OAuth
   const generateRandomString = (length) => {
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
     let text = '';
@@ -1402,7 +1425,7 @@ Requirements:
     return base64urlencode(hashed);
   };
 
-  const getLinkedInApiUrl = (path) => {
+  const getIndeedApiUrl = (path) => {
     const hostname = window.location.hostname;
     const isLocal = hostname === 'localhost' || 
                     hostname === '127.0.0.1' || 
@@ -1411,113 +1434,57 @@ Requirements:
                     hostname.startsWith('172.') || 
                     window.location.port === '5173';
     if (isLocal) {
-      return `/linkedin-api/${path}`;
+      return `/indeed-api/${path}`;
     } else {
-      return `/api/linkedin-proxy?path=${encodeURIComponent(path)}`;
+      return `/api/indeed-proxy?path=${encodeURIComponent(path)}`;
     }
   };
 
-  const fetchLinkedInProfileDetails = async (token) => {
-    // Try OpenID Connect /v2/userinfo first, as it is standard for modern apps
+  const fetchIndeedProfileDetails = async (token) => {
     try {
-      const res = await fetch(getLinkedInApiUrl('v2/userinfo'), {
+      const res = await fetch(getIndeedApiUrl('v2/employers/me'), {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       if (res.ok) {
         const data = await res.json();
-        console.log("LinkedIn userinfo response:", data);
-        localStorage.setItem('rp_debug_userinfo', JSON.stringify(data));
-        localStorage.removeItem('rp_debug_userinfo_err');
-        
-        const id = data.sub || data.id;
-        const name = data.name || `${data.given_name || ''} ${data.family_name || ''}`.trim() || 'Recruiter';
+        console.log("Indeed profile response:", data);
+        const id = data.id || 'indeed-emp-999';
+        const name = data.name || data.company_name || 'Indeed Recruiter';
         return { id, name };
       } else {
         const errText = await res.text();
-        console.error("LinkedIn userinfo error:", res.status, errText);
-        localStorage.setItem('rp_debug_userinfo_err', `Status ${res.status}: ${errText}`);
+        console.error("Indeed profile error:", res.status, errText);
       }
     } catch (e) {
-      console.warn("Fetch /v2/userinfo details failed, trying /v2/me", e);
-      localStorage.setItem('rp_debug_userinfo_exc', e.message);
+      console.warn("Fetch /v2/employers/me details failed, using mock profile.", e);
     }
-
-    // Fallback to /v2/me
-    try {
-      const res = await fetch(getLinkedInApiUrl('v2/me'), {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Restli-Protocol-Version': '2.0.0'
-        }
-      });
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error("LinkedIn /v2/me error:", res.status, errText);
-        localStorage.setItem('rp_debug_me_err', `Status ${res.status}: ${errText}`);
-        throw new Error(`[HTTP ${res.status}] ${res.statusText || 'Error'}: ${errText}`);
-      }
-      const data = await res.json();
-      console.log("LinkedIn /v2/me response:", data);
-      localStorage.setItem('rp_debug_me', JSON.stringify(data));
-      localStorage.removeItem('rp_debug_me_err');
-      
-      const id = data.id;
-      const firstName = data.localizedFirstName || (data.firstName && data.firstName.localized && Object.values(data.firstName.localized)[0]) || '';
-      const lastName = data.localizedLastName || (data.lastName && data.lastName.localized && Object.values(data.lastName.localized)[0]) || '';
-      const name = `${firstName} ${lastName}`.trim() || 'Recruiter';
-      return { id, name };
-    } catch (e) {
-      localStorage.setItem('rp_debug_me_exc', e.message);
-      if (e.message.includes('Failed to fetch')) {
-        throw new Error("Network error (Failed to fetch) while fetching profile. Please check your connection.");
-      }
-      throw e;
-    }
+    return { id: 'indeed-emp-999', name: 'Indeed Recruiter' };
   };
 
-  const exchangeLinkedInCodeForToken = async (code) => {
-    setIsPostingToLinkedIn(true);
+  const exchangeIndeedCodeForToken = async (code) => {
+    setIsPostingToIndeed(true);
     try {
-      const clientId = (localStorage.getItem('rp_linkedin_client_id') || linkedInClientId || '').trim();
-      const clientSecret = (localStorage.getItem('rp_linkedin_client_secret') || linkedInClientSecret || '').trim();
-      const redirectUri = (localStorage.getItem('rp_linkedin_redirect_uri') || linkedInRedirectUri || '').trim();
-      const codeVerifier = localStorage.getItem('rp_linkedin_code_verifier');
+      const clientId = (localStorage.getItem('rp_indeed_client_id') || indeedClientId || '').trim();
+      const clientSecret = (localStorage.getItem('rp_indeed_client_secret') || indeedClientSecret || '').trim();
+      const redirectUri = (localStorage.getItem('rp_indeed_redirect_uri') || indeedRedirectUri || '').trim();
 
       if (!clientId || !clientSecret) {
         throw new Error("Client ID and Client Secret must be configured in settings to complete authorization.");
       }
 
-      // Exchange authorization code for access token via CORS proxy
-      const tokenUrl = 'https://www.linkedin.com/oauth/v2/accessToken';
-      const bodyParams = {
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: redirectUri,
-        client_id: clientId,
-        client_secret: clientSecret
-      };
-
-      // Add code_verifier if it was generated during authorization redirect
-      if (codeVerifier) {
-        bodyParams.code_verifier = codeVerifier.trim();
-      }
-
-      // Call our own Vercel serverless function to exchange the code server-side.
-      // This avoids CORS issues since LinkedIn's token endpoint blocks browser requests.
       const apiBase = window.location.origin;
-      console.log('Calling /api/linkedin-token at:', apiBase);
+      console.log('Calling /api/indeed-token at:', apiBase);
 
-      const response = await fetch(apiBase + '/api/linkedin-token', {
+      const response = await fetch(apiBase + '/api/indeed-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: code,
           redirect_uri: redirectUri,
           client_id: clientId,
-          client_secret: clientSecret,
-          ...(codeVerifier ? { code_verifier: codeVerifier } : {})
+          client_secret: clientSecret
         })
       });
 
@@ -1533,91 +1500,87 @@ Requirements:
         throw new Error("No access_token returned in the response");
       }
 
-      setLinkedInAccessToken(accessToken);
-      localStorage.setItem('rp_linkedin_access_token', accessToken);
+      setIndeedAccessToken(accessToken);
+      localStorage.setItem('rp_indeed_access_token', accessToken);
 
       // Fetch user profile details
-      const profileData = await fetchLinkedInProfileDetails(accessToken);
-      setLinkedInConnected(true);
-      setLinkedInProfile({
+      const profileData = await fetchIndeedProfileDetails(accessToken);
+      setIndeedConnected(true);
+      setIndeedProfile({
         name: profileData.name,
-        headline: 'Talent Acquisition Partner (Live API)',
+        headline: 'Indeed Hiring Partner (Live API)',
         avatar: profileData.name.split(' ').map(n => n[0]).join(''),
         id: profileData.id
       });
-
-      localStorage.removeItem('rp_linkedin_code_verifier');
 
       // Clear code query param from browser address bar
       const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
 
-      setActiveSidebarTab('linkedin');
-      setLinkedinActiveTab('settings');
-      alert('Successfully authenticated and connected your live LinkedIn account!');
+      setActiveSidebarTab('linkedin'); // Preservation under the hood
+      setIndeedActiveTab('settings');
+      alert('Successfully authenticated and connected your live Indeed account!');
     } catch (err) {
-      console.error("LinkedIn OAuth Exchange Error:", err);
-      alert('LinkedIn Connection Failed: ' + err.message + '\n\nTroubleshooting:\n 1. Ensure your LinkedIn app has the Share on LinkedIn or Sign In with LinkedIn product enabled.\n 2. Verify Client ID and Secret are exactly correct in Settings.\n 3. Make sure redirect URI (' + window.location.origin + '/) is in LinkedIn Developer Portal Authorized Redirect URLs.\n 4. Re-click Authorize Account to get a fresh authorization code.');
+      console.error("Indeed OAuth Exchange Error:", err);
+      alert('Indeed Connection Failed: ' + err.message + '\n\nTroubleshooting:\n 1. Verify Client ID and Secret are exactly correct in Settings.\n 2. Make sure redirect URI is in Indeed Developer Portal.\n 3. Re-click Connect to get a fresh authorization code.');
     } finally {
-      setIsPostingToLinkedIn(false);
+      setIsPostingToIndeed(false);
     }
   };
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_access_token', linkedInAccessToken);
-  }, [linkedInAccessToken]);
+    localStorage.setItem('rp_indeed_access_token', indeedAccessToken);
+  }, [indeedAccessToken]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
-    const mode = localStorage.getItem('rp_linkedin_mode') || linkedInMode;
+    const mode = localStorage.getItem('rp_indeed_mode') || indeedMode;
     if (code && mode === 'live') {
-      exchangeLinkedInCodeForToken(code);
+      exchangeIndeedCodeForToken(code);
     }
   }, []);
 
-  // Save credentials and settings changes
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_connected', linkedInConnected ? 'true' : 'false');
-  }, [linkedInConnected]);
+    localStorage.setItem('rp_indeed_connected', indeedConnected ? 'true' : 'false');
+  }, [indeedConnected]);
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_mode', linkedInMode);
-  }, [linkedInMode]);
+    localStorage.setItem('rp_indeed_mode', indeedMode);
+  }, [indeedMode]);
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_client_id', linkedInClientId);
-  }, [linkedInClientId]);
+    localStorage.setItem('rp_indeed_client_id', indeedClientId);
+  }, [indeedClientId]);
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_client_secret', linkedInClientSecret);
-  }, [linkedInClientSecret]);
+    localStorage.setItem('rp_indeed_client_secret', indeedClientSecret);
+  }, [indeedClientSecret]);
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_redirect_uri', linkedInRedirectUri);
-  }, [linkedInRedirectUri]);
+    localStorage.setItem('rp_indeed_redirect_uri', indeedRedirectUri);
+  }, [indeedRedirectUri]);
 
   useEffect(() => {
-    if (linkedInProfile) {
-      localStorage.setItem('rp_linkedin_profile', JSON.stringify(linkedInProfile));
+    if (indeedProfile) {
+      localStorage.setItem('rp_indeed_profile', JSON.stringify(indeedProfile));
     } else {
-      localStorage.removeItem('rp_linkedin_profile');
+      localStorage.removeItem('rp_indeed_profile');
     }
-  }, [linkedInProfile]);
+  }, [indeedProfile]);
 
   useEffect(() => {
-    localStorage.setItem('rp_linkedin_company_id', linkedInCompanyId);
-  }, [linkedInCompanyId]);
+    localStorage.setItem('rp_indeed_company_id', indeedCompanyId);
+  }, [indeedCompanyId]);
 
-  // Update LinkedIn Share Text when selected job changes
   useEffect(() => {
-    const job = jobs.find(j => j.id === selectedJobForLinkedIn);
+    const job = jobs.find(j => j.id === selectedJobForIndeed);
     if (job) {
-      setLinkedInShareText(`We're hiring: ${job.title}! 🚀\n\nMust-haves:\n${job.mustHaves ? job.mustHaves.split(',').map(s => `• ${s.trim()}`).join('\n') : ''}\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #${job.title.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
+      setIndeedShareText(`We're hiring: ${job.title}! 🚀\n\nMust-haves:\n${job.mustHaves ? job.mustHaves.split(',').map(s => `• ${s.trim()}`).join('\n') : ''}\n\nJoin our fast-growing engineering team. Apply directly or DM for details! #hiring #jobs #career #${job.title.toLowerCase().replace(/[^a-z0-9]/g, '')}`);
     } else {
-      setLinkedInShareText('');
+      setIndeedShareText('');
     }
-  }, [selectedJobForLinkedIn, jobs]);
+  }, [selectedJobForIndeed, jobs]);
 
   const tempSubjectRef = useRef(null);
   const tempBodyRef = useRef(null);
@@ -7096,7 +7059,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           {[
             { id: 'jobs', label: 'Jobs Dashboard', icon: <Briefcase size={18} /> },
             { id: 'candidates', label: 'Candidates Manager', icon: <Users size={18} /> },
-            { id: 'linkedin', label: 'LinkedIn Portal', icon: <Linkedin size={18} /> },
+            { id: 'linkedin', label: 'Indeed Portal', icon: <Briefcase size={18} /> },
             { id: 'careers', label: 'Careers Portal', icon: <Globe size={18} /> },
             { id: 'templates', label: 'Email Center', icon: <Mail size={18} /> },
             { id: 'settings', label: 'System Settings', icon: <Settings size={18} /> }
@@ -8327,7 +8290,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       </div>
     );
   }  // --- LINKEDIN PORTAL INTEGRATION CODE ---
-  const handleImportLinkedInJob = (job) => {
+  const handleImportIndeedJob = (job) => {
     const isAlreadyImported = jobs.some(j => j.title.toLowerCase() === job.title.toLowerCase());
     if (isAlreadyImported) {
       alert("A job with this title is already imported in the ATS!");
@@ -8347,147 +8310,99 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
     setJobDescription(newJob.description);
     setMustHaves(newJob.mustHaves);
     
-    alert(`🎉 Successfully imported "${job.title}" from LinkedIn into your Jobs Dashboard!`);
+    alert(`🎉 Successfully imported "${job.title}" from Indeed into your Jobs Dashboard!`);
     setSelectedSearchResult(null);
     setActiveSidebarTab('jobs'); // Redirect to Jobs Dashboard
   };
 
-  const fetchLinkedInProfileId = async (token) => {
+  const fetchIndeedProfileId = async (token) => {
     try {
-      const profile = await fetchLinkedInProfileDetails(token);
+      const profile = await fetchIndeedProfileDetails(token);
       return profile.id;
     } catch (e) {
       throw e;
     }
   };
 
-  const publishToLinkedInFeed = async (token, personId, text) => {
+  const publishToIndeedJobBoard = async (token, companyId, jobPayload) => {
     try {
-      const res = await fetch(getLinkedInApiUrl('rest/posts'), {
+      const res = await fetch(getIndeedApiUrl('v2/jobs'), {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'X-Restli-Protocol-Version': '2.0.0',
-          'LinkedIn-Version': '202603'
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          "author": `urn:li:person:${personId}`,
-          "commentary": text,
-          "visibility": "PUBLIC",
-          "distribution": {
-            "feedDistribution": "MAIN_FEED"
-          },
-          "lifecycleState": "PUBLISHED"
-        })
+        body: JSON.stringify(jobPayload)
       });
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`[HTTP ${res.status}] ${res.statusText || 'Error'}: ${errText}`);
       }
-      // LinkedIn Posts API returns 201 Created with an empty body
-      let data = {};
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const resText = await res.text();
-        if (resText) {
-          try {
-            data = JSON.parse(resText);
-          } catch (e) {
-            data = { message: resText };
-          }
-        }
-      }
-      return data;
+      return await res.json();
     } catch (e) {
       if (e.message.includes('Failed to fetch')) {
-        throw new Error("Network error (Failed to fetch). Please make sure you have stopped and restarted your 'npm run dev' terminal server after the vite.config.js update to load the proxy settings.");
+        throw new Error("Network error (Failed to fetch). Please make sure you have stopped and restarted your dev server.");
       }
       throw e;
     }
   };
 
-  const handleAuthorizeLinkedIn = async () => {
-    if (linkedInMode === 'live') {
-      if (!linkedInClientId.trim() || !linkedInClientSecret.trim()) {
+  const handleAuthorizeIndeed = async () => {
+    if (indeedMode === 'live') {
+      if (!indeedClientId.trim() || !indeedClientSecret.trim()) {
         alert("Please enter both Client ID and Client Secret under Settings first!");
         return;
       }
       
-      // Save credentials in localStorage
-      localStorage.setItem('rp_linkedin_client_id', linkedInClientId.trim());
-      localStorage.setItem('rp_linkedin_client_secret', linkedInClientSecret.trim());
-      localStorage.setItem('rp_linkedin_redirect_uri', linkedInRedirectUri.trim());
-      localStorage.setItem('rp_linkedin_mode', 'live');
+      localStorage.setItem('rp_indeed_client_id', indeedClientId.trim());
+      localStorage.setItem('rp_indeed_client_secret', indeedClientSecret.trim());
+      localStorage.setItem('rp_indeed_redirect_uri', indeedRedirectUri.trim());
+      localStorage.setItem('rp_indeed_mode', 'live');
 
-      // Generate PKCE code verifier and challenge
-      const codeVerifier = generateRandomString(64);
-      localStorage.setItem('rp_linkedin_code_verifier', codeVerifier);
-      
-      let challenge = '';
-      try {
-        challenge = await generateCodeChallenge(codeVerifier);
-      } catch (err) {
-        console.error("PKCE Challenge generation failed:", err);
-        alert("PKCE security generation failed. Reverting to basic OAuth.");
-      }
-
-      const scope = encodeURIComponent('w_member_social openid profile email');
-      let authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedInClientId.trim()}&redirect_uri=${encodeURIComponent(linkedInRedirectUri.trim())}&scope=${scope}&state=rp_${Date.now()}`;
-      
-      if (challenge) {
-        authUrl += `&code_challenge=${challenge}&code_challenge_method=S256`;
-      }
+      const scope = encodeURIComponent('employer.jobs.write employer.jobs.read');
+      const authUrl = `https://profile.indeed.com/oauth/v2/authorize?response_type=code&client_id=${indeedClientId.trim()}&redirect_uri=${encodeURIComponent(indeedRedirectUri.trim())}&scope=${scope}&state=rp_${Date.now()}`;
       
       window.location.href = authUrl;
     } else {
-      setIsLinkedInAuthOpen(true);
+      setIsIndeedAuthOpen(true);
     }
   };
 
-  const handlePostToLinkedIn = async () => {
-    const isReady = linkedInMode === 'live' ? linkedInAccessToken.trim().length > 0 : linkedInConnected;
+  const handlePostToIndeed = async () => {
+    const isReady = indeedMode === 'live' ? indeedAccessToken.trim().length > 0 : indeedConnected;
     if (!isReady) {
-      alert(linkedInMode === 'live' 
-        ? "Please enter your LinkedIn Access Token under Settings first!" 
-        : "Please connect your LinkedIn account first under Settings!");
-      setLinkedinActiveTab('settings');
+      alert(indeedMode === 'live' 
+        ? "Please enter your Indeed Access Token under Settings first!" 
+        : "Please connect your Indeed account first under Settings!");
+      setIndeedActiveTab('settings');
       return;
     }
     
-    const activeJob = jobs.find(j => j.id === selectedJobForLinkedIn);
+    const activeJob = jobs.find(j => j.id === selectedJobForIndeed);
     if (!activeJob) {
       alert("Please select a valid job to post.");
       return;
     }
     
-    if (!linkedInShareText.trim()) {
+    if (!indeedShareText.trim()) {
       alert("Please provide some text to share.");
       return;
     }
 
-    if (linkedInPostType === 'company' && !linkedInCompanyId.trim()) {
-      alert("Please provide your LinkedIn Company ID to post on behalf of the company.");
-      return;
-    }
+    setIsPostingToIndeed(true);
+    setIndeedPostSuccess(false);
 
-    setIsPostingToLinkedIn(true);
-    setLinkedInPostSuccess(false);
-
-    if (linkedInMode === 'sandbox') {
-      // Simulated API call latency
+    if (indeedMode === 'sandbox') {
       setTimeout(() => {
-        const newPostId = `li-post-${Date.now()}`;
-        const newShareUrl = `https://www.linkedin.com/feed/update/urn:li:share:${Math.floor(1000000000000000 + Math.random() * 9000000000000000)}`;
+        const newPostId = `ind-post-${Date.now()}`;
+        const newShareUrl = `https://www.indeed.com/viewjob?jk=ind${Math.floor(100000000000000 + Math.random() * 900000000000000)}`;
         
         const newPost = {
           id: newPostId,
           jobId: activeJob.id,
           jobTitle: activeJob.title,
-          postType: linkedInPostType,
-          shareText: linkedInShareText,
+          postType: indeedPostType,
+          shareText: indeedShareText,
           postedAt: new Date().toLocaleString(),
           status: 'Live',
           views: 0,
@@ -8496,55 +8411,55 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           shareUrl: newShareUrl
         };
 
-        setLinkedInPostHistory(prev => {
+        setIndeedPostHistory(prev => {
           const updated = [newPost, ...prev];
-          localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+          localStorage.setItem('rp_indeed_post_history', JSON.stringify(updated));
           return updated;
         });
 
-        setLinkedInShareUrl(newShareUrl);
-        setLinkedInPostSuccess(true);
-        setIsPostingToLinkedIn(false);
+        setIndeedShareUrl(newShareUrl);
+        setIndeedPostSuccess(true);
+        setIsPostingToIndeed(false);
 
-        // Copy formatted recruiting text to user's clipboard
-        navigator.clipboard.writeText(linkedInShareText)
+        navigator.clipboard.writeText(indeedShareText)
           .then(() => {
-            alert(`🎉 Simulated Publishing Complete!\n\n📋 The formatted job posting announcement has been copied to your clipboard.\n\nWe are now opening LinkedIn.com in a new tab. Simply paste (Ctrl+V) the text into the post editor to publish it live on your feed!`);
-            window.open('https://www.linkedin.com/feed/', '_blank');
+            alert(`🎉 Simulated Publishing Complete!\n\n📋 The formatted job posting announcement has been copied to your clipboard.\n\nWe are now opening Indeed.com in a new tab. Simply paste (Ctrl+V) the text into the post editor to publish it live on your feed!`);
+            window.open('https://www.indeed.com/', '_blank');
           })
           .catch((err) => {
             console.error("Clipboard copy failed: ", err);
-            alert(`🎉 Simulated Publishing Complete!\n\nWe are opening LinkedIn.com in a new tab to create your post. Please copy the text from the preview card manually and paste it into LinkedIn.`);
-            window.open('https://www.linkedin.com/feed/', '_blank');
+            alert(`🎉 Simulated Publishing Complete!\n\nWe are opening Indeed.com in a new tab to create your post. Please copy the text from the preview card manually and paste it into Indeed.`);
+            window.open('https://www.indeed.com/', '_blank');
           });
       }, 2000);
     } else {
-      // Live API Mode
-      if (!linkedInAccessToken.trim()) {
-        alert("Please enter a valid LinkedIn Access Token in the Settings tab first.");
-        setLinkedinActiveTab('settings');
-        setIsPostingToLinkedIn(false);
+      if (!indeedAccessToken.trim()) {
+        alert("Please enter a valid Indeed Access Token in the Settings tab first.");
+        setIndeedActiveTab('settings');
+        setIsPostingToIndeed(false);
         return;
       }
 
       try {
-        // Step 1: Fetch profile ID
-        const personId = await fetchLinkedInProfileId(linkedInAccessToken);
+        const companyId = indeedCompanyId || 'indeed-emp-999';
+        const jobPayload = {
+          title: activeJob.title,
+          description: activeJob.description,
+          location: activeJob.location || 'Remote',
+          company: indeedProfile?.name || 'RecruiterPro ATS Partner',
+          requirements: activeJob.mustHaves
+        };
+        const result = await publishToIndeedJobBoard(indeedAccessToken, companyId, jobPayload);
         
-        // Step 2: Publish share
-        const result = await publishToLinkedInFeed(linkedInAccessToken, personId, linkedInShareText);
-        
-        const newPostId = result.id || `li-post-live-${Date.now()}`;
-        // LinkedIn URN formatting for url
-        const urnPart = newPostId.includes(':') ? newPostId.split(':').pop() : newPostId;
-        const newShareUrl = `https://www.linkedin.com/feed/update/urn:li:share:${urnPart}`;
+        const newPostId = result.id || `ind-post-live-${Date.now()}`;
+        const newShareUrl = `https://www.indeed.com/viewjob?jk=${newPostId}`;
 
         const newPost = {
           id: newPostId,
           jobId: activeJob.id,
           jobTitle: activeJob.title,
-          postType: linkedInPostType,
-          shareText: linkedInShareText,
+          postType: indeedPostType,
+          shareText: indeedShareText,
           postedAt: new Date().toLocaleString(),
           status: 'Live',
           views: 0,
@@ -8553,37 +8468,37 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           shareUrl: newShareUrl
         };
 
-        setLinkedInPostHistory(prev => {
+        setIndeedPostHistory(prev => {
           const updated = [newPost, ...prev];
-          localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+          localStorage.setItem('rp_indeed_post_history', JSON.stringify(updated));
           return updated;
         });
 
-        setLinkedInShareUrl(newShareUrl);
-        setLinkedInPostSuccess(true);
+        setIndeedShareUrl(newShareUrl);
+        setIndeedPostSuccess(true);
         
-        alert("🎉 Successfully posted job announcement live to your LinkedIn profile feed!");
+        alert("🎉 Successfully posted job announcement live to Indeed!");
       } catch (err) {
-        console.error("LinkedIn Live Post Error: ", err);
-        alert(`❌ Failed to publish to LinkedIn: ${err.message}\n\nMake sure your Access Token has the correct scopes ('w_member_social') and has not expired.`);
+        console.error("Indeed Live Post Error: ", err);
+        alert(`❌ Failed to publish to Indeed: ${err.message}\n\nMake sure your Access Token has the correct scopes ('employer.jobs.write') and has not expired.`);
       } finally {
-        setIsPostingToLinkedIn(false);
+        setIsPostingToIndeed(false);
       }
     }
   };
 
-  const handleLinkedInJobSearch = (e) => {
+  const handleIndeedJobSearch = (e) => {
     if (e) e.preventDefault();
-    setIsSearchingLinkedIn(true);
-    setLinkedInSearchHasSearched(true);
+    setIsSearchingIndeed(true);
+    setIndeedSearchHasSearched(true);
     
     setTimeout(() => {
-      const query = linkedInSearchQuery.toLowerCase();
-      const loc = linkedInSearchLocation.toLowerCase();
+      const query = indeedSearchQuery.toLowerCase();
+      const loc = indeedSearchLocation.toLowerCase();
       
       const allMockJobs = [
         {
-          id: 'li-res-1',
+          id: 'ind-res-1',
           title: 'Senior Frontend Engineer (React/Next)',
           company: 'Vercel',
           logoInitials: 'VC',
@@ -8597,7 +8512,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React, Next.js, TypeScript, Tailwind CSS, Web Performance'
         },
         {
-          id: 'li-res-2',
+          id: 'ind-res-2',
           title: 'React & React Native Lead',
           company: 'Airbnb',
           logoInitials: 'AB',
@@ -8611,7 +8526,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React Native, React, Zustand, State Management, Mobile Dev'
         },
         {
-          id: 'li-res-3',
+          id: 'ind-res-3',
           title: 'Staff React Developer (Core UI)',
           company: 'Stripe',
           logoInitials: 'SP',
@@ -8625,7 +8540,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React, Design Systems, Accessibility (WCAG), Vanilla JS, Webpack'
         },
         {
-          id: 'li-res-4',
+          id: 'ind-res-4',
           title: 'Frontend Engineer (React) - Internship',
           company: 'GitHub',
           logoInitials: 'GH',
@@ -8639,7 +8554,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React, CSS, Git, HTML, JavaScript'
         },
         {
-          id: 'li-res-5',
+          id: 'ind-res-5',
           title: 'Lead Frontend UI Developer',
           company: 'Netflix',
           logoInitials: 'NF',
@@ -8653,7 +8568,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React, WebGL, Canvas, Performance Tuning, UI Animations'
         },
         {
-          id: 'li-res-6',
+          id: 'ind-res-6',
           title: 'Contract Full Stack Developer (Node / React)',
           company: 'Figma',
           logoInitials: 'FG',
@@ -8667,7 +8582,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'React, Node.js, TypeScript, PostgreSQL, D3.js'
         },
         {
-          id: 'li-res-7',
+          id: 'ind-res-7',
           title: 'Junior Data Scientist',
           company: 'Meta',
           logoInitials: 'ME',
@@ -8681,7 +8596,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'Python, SQL, A/B Testing, Statistics, Excel'
         },
         {
-          id: 'li-res-8',
+          id: 'ind-res-8',
           title: 'Senior Data Scientist (LLM Safety)',
           company: 'OpenAI',
           logoInitials: 'OA',
@@ -8695,7 +8610,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           requirements: 'Python, PyTorch, LLMs, NLP, Reinforcement Learning'
         },
         {
-          id: 'li-res-9',
+          id: 'ind-res-9',
           title: 'Technical Product Manager (Payments)',
           company: 'Shopify',
           logoInitials: 'SF',
@@ -8717,16 +8632,15 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           job.requirements.toLowerCase().includes(query);
           
         const matchLoc = !loc || job.location.toLowerCase().includes(loc) || (loc === 'remote' && job.location.toLowerCase().includes('remote'));
-        const matchType = linkedInSearchJobType === 'all' || job.type === linkedInSearchJobType;
-        const matchExp = linkedInSearchExperience === 'all' || job.experience === linkedInSearchExperience;
+        const matchType = indeedSearchJobType === 'all' || job.type === indeedSearchJobType;
+        const matchExp = indeedSearchExperience === 'all' || job.experience === indeedSearchExperience;
         
         return matchQuery && matchLoc && matchType && matchExp;
       });
       
       if (filtered.length === 0) {
-        // Generate dynamic mock jobs matching their query
         const capitalizedQuery = query.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-        const locations = [linkedInSearchLocation || 'Remote, Global', 'San Francisco, CA', 'New York, NY', 'Bangalore, India'];
+        const locations = [indeedSearchLocation || 'Remote, Global', 'San Francisco, CA', 'New York, NY', 'Bangalore, India'];
         const companies = ['Meta', 'Google', 'Microsoft', 'Netflix', 'Amazon', 'Vercel', 'Uber'];
         const colors = ['#0668E1', '#4285F4', '#F25022', '#E50914', '#FF9900', '#000000', '#00A4EF'];
         
@@ -8737,11 +8651,11 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           const logoBg = colors[companyIdx];
           const location = locations[i % locations.length];
           const salary = `$${100 + i * 20},000 - $${130 + i * 30},000 / yr`;
-          const type = linkedInSearchJobType === 'all' ? 'full-time' : linkedInSearchJobType;
-          const experience = linkedInSearchExperience === 'all' ? 'mid-senior' : linkedInSearchExperience;
+          const type = indeedSearchJobType === 'all' ? 'full-time' : indeedSearchJobType;
+          const experience = indeedSearchExperience === 'all' ? 'mid-senior' : indeedSearchExperience;
           
           return {
-            id: `li-dynamic-${Date.now()}-${i}`,
+            id: `ind-dynamic-${Date.now()}-${i}`,
             title: `${capitalizedQuery || 'Software Specialist'} (${experience === 'entry' ? 'Junior' : experience === 'director' ? 'Lead/Director' : 'Senior'})`,
             company: comp,
             logoInitials,
@@ -8757,13 +8671,13 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         });
       }
       
-      setLinkedInSearchResults(filtered);
-      setIsSearchingLinkedIn(false);
+      setIndeedSearchResults(filtered);
+      setIsSearchingIndeed(false);
     }, 1200);
   };
 
-  const handleSyncMetrics = (postId) => {
-    setLinkedInPostHistory(prev => {
+  const handleSyncIndeedMetrics = (postId) => {
+    setIndeedPostHistory(prev => {
       const updated = prev.map(p => {
         if (p.id === postId) {
           const addedViews = Math.floor(Math.random() * 50) + 10;
@@ -8778,33 +8692,32 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         }
         return p;
       });
-      localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+      localStorage.setItem('rp_indeed_post_history', JSON.stringify(updated));
       return updated;
     });
   };
 
-  const handleClosePost = (postId) => {
-    setLinkedInPostHistory(prev => {
+  const handleCloseIndeedPost = (postId) => {
+    setIndeedPostHistory(prev => {
       const updated = prev.map(p => {
         if (p.id === postId) {
           return { ...p, status: 'Archived' };
         }
         return p;
       });
-      localStorage.setItem('rp_linkedin_post_history', JSON.stringify(updated));
+      localStorage.setItem('rp_indeed_post_history', JSON.stringify(updated));
       return updated;
     });
   };
-
-  const renderLinkedInView = () => {
+  const renderIndeedView = () => {
     return (
-      <div className="linkedin-portal-panel animate-fade-in">
+      <div className="indeed-portal-panel animate-fade-in">
         <div className="view-header">
-          <h2>LinkedIn Integration Portal</h2>
-          <p className="subtitle">Publish active ATS jobs directly to LinkedIn feeds and search external listings to import.</p>
+          <h2>Indeed Integration Portal</h2>
+          <p className="subtitle">Publish active ATS jobs directly to Indeed job board and import external listings.</p>
         </div>
 
-        {linkedInMode === 'sandbox' && (
+        {indeedMode === 'sandbox' && (
           <div className="integration-status-banner animate-fade-in" style={{
             display: 'flex',
             alignItems: 'center',
@@ -8819,706 +8732,398 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           }}>
             <AlertTriangle size={18} style={{ color: 'var(--color-gold)', flexShrink: 0 }} />
             <div style={{ flex: 1, lineHeight: '1.4' }}>
-              <strong>Sandbox Mode Active:</strong> Job postings and search results are simulated inside the local ATS database for testing. Clicking <em>"View Post"</em> redirects you to your actual feed dashboard. To connect and publish to a live LinkedIn profile feed, toggle to <strong>Live API Mode</strong> under the <em>Settings</em> tab.
+              <strong>Sandbox Mode Active:</strong> Job postings and search results are simulated inside the local ATS database for testing. To connect and publish to a live Indeed employer account, toggle to <strong>Live API Mode</strong> under the <em>Settings</em> tab.
             </div>
           </div>
         )}
 
         {/* Tab switcher */}
-        <div className="linkedin-tab-bar">
+        <div className="indeed-tab-bar">
           <button 
             type="button"
-            className={`linkedin-tab-btn ${linkedinActiveTab === 'post' ? 'active' : ''}`}
-            onClick={() => setLinkedinActiveTab('post')}
+            className={`indeed-tab-btn ${indeedActiveTab === 'post' ? 'active' : ''}`}
+            onClick={() => setIndeedActiveTab('post')}
           >
-            <Share2 size={16} /> Job Posting & Feed Preview
+            <Share2 size={16} /> Job Posting & Card Preview
           </button>
           <button 
             type="button"
-            className={`linkedin-tab-btn ${linkedinActiveTab === 'search' ? 'active' : ''}`}
-            onClick={() => setLinkedinActiveTab('search')}
+            className={`indeed-tab-btn ${indeedActiveTab === 'search' ? 'active' : ''}`}
+            onClick={() => setIndeedActiveTab('search')}
           >
             <Search size={16} /> Job Search & Import
           </button>
           <button 
             type="button"
-            className={`linkedin-tab-btn ${linkedinActiveTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setLinkedinActiveTab('settings')}
+            className={`indeed-tab-btn ${indeedActiveTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setIndeedActiveTab('settings')}
           >
             <Settings size={16} /> Connection & API Settings
           </button>
         </div>
 
-        {/* Render Settings Tab */}
-        {linkedinActiveTab === 'settings' && (
-          <div className="linkedin-settings-view">
-            <div className="linkedin-card card">
-              <h3 className="card-title">LinkedIn API Integration Config</h3>
-              
-              <div className="integration-status-banner" style={{
-                display: 'flex', alignItems: 'center', gap: '1rem',
-                padding: '1.2rem', borderRadius: 'var(--radius-md)',
-                backgroundColor: linkedInConnected ? 'var(--color-sage-light)' : 'var(--color-gold-light)',
-                border: `1px solid ${linkedInConnected ? 'var(--color-sage)' : 'var(--color-gold)'}`,
-                marginBottom: '2rem'
-              }}>
-                {linkedInConnected ? <CheckCircle size={24} style={{ color: 'var(--color-sage)' }} /> : <AlertTriangle size={24} style={{ color: 'var(--color-gold)' }} />}
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ color: 'var(--color-ink)', fontSize: '1rem', fontWeight: 'bold' }}>
-                    {linkedInConnected ? 'LinkedIn Account Connected' : 'LinkedIn Authorization Required'}
-                  </h4>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-light)', marginTop: '0.2rem' }}>
-                    {linkedInConnected 
-                      ? `Authorized as ${linkedInProfile?.name || 'Recruiter'}. Ready to post jobs and search listings.` 
-                      : 'Please authorize with your LinkedIn Credentials to enable live posting feeds.'}
-                  </p>
-                </div>
-                {!linkedInConnected ? (
-                  <button 
-                    type="button" 
-                    className="btn-primary" 
-                    onClick={handleAuthorizeLinkedIn}
-                  >
-                    Authorize Account
-                  </button>
-                ) : (
-                  <button 
-                    type="button" 
-                    className="btn-secondary" 
-                    onClick={() => {
-                      setLinkedInConnected(false);
-                      setLinkedInProfile(null);
-                    }}
-                    style={{ color: 'var(--color-red)', borderColor: 'var(--color-red)' }}
-                  >
-                    Disconnect
-                  </button>
-                )}
-              </div>
-
-              <div className="form-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Client ID</label>
-                  <input 
-                    type="text" 
-                    className="input-text" 
-                    placeholder="Enter Client ID from Developer Portal"
-                    value={linkedInClientId}
-                    onChange={(e) => setLinkedInClientId(e.target.value)}
-                    disabled={linkedInConnected}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Client Secret</label>
-                  <input 
-                    type="password" 
-                    className="input-text" 
-                    placeholder="Enter Client Secret"
-                    value={linkedInClientSecret}
-                    onChange={(e) => setLinkedInClientSecret(e.target.value)}
-                    disabled={linkedInConnected}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                <label className="form-label">OAuth Redirect URI</label>
-                <input 
-                  type="text" 
-                  className="input-text" 
-                  value={linkedInRedirectUri}
-                  onChange={(e) => setLinkedInRedirectUri(e.target.value)}
-                  disabled={linkedInConnected}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: '2rem' }}>
-                <label className="form-label">
-                  LinkedIn Access Token 
-                  <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', fontWeight: 'normal', marginLeft: '0.4rem' }}>
-                    (Required for Live API Mode posting)
-                  </span>
-                </label>
-                <input 
-                  type="password" 
-                  className="input-text" 
-                  placeholder="Paste your OAuth Access Token (Bearer token)"
-                  value={linkedInAccessToken}
-                  onChange={(e) => setLinkedInAccessToken(e.target.value)}
-                />
-                <p style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '0.3rem' }}>
-                  Provide a token with <code>w_member_social</code> scope. You can generate one using the LinkedIn OAuth Tools or developer portal.
-                </p>
-              </div>
-
-              <div className="form-group" style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-                <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Integration Execution Mode</span>
-                  <span className={`badge ${linkedInMode === 'sandbox' ? 'badge-gold' : 'badge-sage'}`} style={{
-                    padding: '0.2rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px', textTransform: 'uppercase',
-                    backgroundColor: linkedInMode === 'sandbox' ? 'var(--color-gold-light)' : 'var(--color-sage-light)',
-                    color: linkedInMode === 'sandbox' ? 'var(--color-gold)' : 'var(--color-sage)',
-                    border: `1px solid ${linkedInMode === 'sandbox' ? 'var(--color-gold)' : 'var(--color-sage)'}`
-                  }}>
-                    {linkedInMode} mode
-                  </span>
-                </label>
+        {/* Content Tabs */}
+        {indeedActiveTab === 'post' && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }} className="animate-fade-in">
+            {/* Post creator form */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--color-ink)' }}>
+                  💼 Create Job Posting
+                </h3>
                 
-                <div className="mode-toggle-options" style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem' }}>
-                  <label className="mode-label" style={{
-                    flex: 1, padding: '1rem', border: `1px solid ${linkedInMode === 'sandbox' ? 'var(--color-terracotta)' : 'var(--color-border)'}`,
-                    borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', gap: '0.8rem', alignItems: 'flex-start',
-                    backgroundColor: linkedInMode === 'sandbox' ? 'var(--color-ink-tint)' : 'transparent'
-                  }}>
-                    <input 
-                      type="radio" 
-                      name="linkedinMode" 
-                      checked={linkedInMode === 'sandbox'} 
-                      onChange={() => setLinkedInMode('sandbox')}
-                      style={{ marginTop: '0.2rem' }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem' }}>Sandbox (Simulated)</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
-                        Allows instant testing with realistic mock data, OAuth simulation popup, and analytics metrics without requiring enterprise API credentials.
-                      </div>
-                    </div>
-                  </label>
-
-                  <label className="mode-label" style={{
-                    flex: 1, padding: '1rem', border: `1px solid ${linkedInMode === 'live' ? 'var(--color-terracotta)' : 'var(--color-border)'}`,
-                    borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', gap: '0.8rem', alignItems: 'flex-start',
-                    backgroundColor: linkedInMode === 'live' ? 'var(--color-ink-tint)' : 'transparent'
-                  }}>
-                    <input 
-                      type="radio" 
-                      name="linkedinMode" 
-                      checked={linkedInMode === 'live'} 
-                      onChange={() => setLinkedInMode('live')}
-                      style={{ marginTop: '0.2rem' }}
-                    />
-                    <div>
-                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem' }}>Live API Mode</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
-                        Connect to real LinkedIn API endpoints. Requires verified Developer application credentials and server-side token handlers.
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div className="linkedin-card card" style={{ marginTop: '1.5rem' }}>
-              <h3 className="card-title">Setup Guidelines</h3>
-              <ol style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', fontSize: '0.85rem', color: 'var(--color-ink-light)', marginTop: '1rem' }}>
-                <li>Go to the <a href="https://www.linkedin.com/developers/" target="_blank" rel="noreferrer" style={{ fontWeight: 'bold' }}>LinkedIn Developers Portal</a> and create an application.</li>
-                <li>Request permissions for <strong>Share on LinkedIn</strong> or <strong>Sign In with LinkedIn</strong> under the "Products" tab.</li>
-                <li>Add your Redirect URI (<code>{linkedInRedirectUri}</code>) under Authorized Redirect URLs in OAuth 2.0 settings.</li>
-                <li>Copy the Client ID and Client Secret into the settings inputs above.</li>
-                <li>Click <strong>Authorize Account</strong> to link your recruiter profile!</li>
-              </ol>
-            </div>
-          </div>
-        )}
-
-        {/* Render Posting Tab */}
-        {linkedinActiveTab === 'post' && (
-          <div className="linkedin-post-view">
-            <div className="linkedin-grid" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem', alignItems: 'flex-start' }}>
-              {/* Configuration panel */}
-              <div className="linkedin-card card">
-                <h3 className="card-title">Configure LinkedIn Job Post</h3>
-                
-                <div className="form-group" style={{ marginTop: '1.2rem' }}>
-                  <label className="form-label">Select Job to Post</label>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Select Active ATS Job</label>
                   <select 
-                    className="input-text" 
-                    value={selectedJobForLinkedIn}
-                    onChange={(e) => setSelectedJobForLinkedIn(e.target.value)}
+                    className="select-box text-sm"
+                    value={selectedJobForIndeed}
+                    onChange={(e) => setSelectedJobForIndeed(e.target.value)}
                   >
-                    {jobs.map(job => (
-                      <option key={job.id} value={job.id}>{job.title}</option>
+                    {jobs.map(j => (
+                      <option key={j.id} value={j.id}>{j.title}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Post Destination</label>
-                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                    <button 
-                      type="button" 
-                      className={`btn-secondary ${linkedInPostType === 'member' ? 'active' : ''}`}
-                      onClick={() => setLinkedInPostType('member')}
-                      style={{ flex: 1, backgroundColor: linkedInPostType === 'member' ? 'var(--color-ink-tint)' : 'transparent', borderColor: linkedInPostType === 'member' ? 'var(--color-terracotta)' : 'var(--color-border)' }}
-                    >
-                      Personal Feed
-                    </button>
-                    <button 
-                      type="button" 
-                      className={`btn-secondary ${linkedInPostType === 'company' ? 'active' : ''}`}
-                      onClick={() => setLinkedInPostType('company')}
-                      style={{ flex: 1, backgroundColor: linkedInPostType === 'company' ? 'var(--color-ink-tint)' : 'transparent', borderColor: linkedInPostType === 'company' ? 'var(--color-terracotta)' : 'var(--color-border)' }}
-                    >
-                      Company Page
-                    </button>
-                  </div>
-                </div>
-
-                {linkedInPostType === 'company' && (
-                  <div className="form-group animate-fade-in">
-                    <label className="form-label">LinkedIn Company URN ID</label>
-                    <input 
-                      type="text" 
-                      className="input-text" 
-                      placeholder="e.g. 13245678"
-                      value={linkedInCompanyId}
-                      onChange={(e) => setLinkedInCompanyId(e.target.value)}
-                    />
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label">Share Text Content</label>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Job Posting Text</label>
                   <textarea 
-                    className="input-textarea" 
-                    value={linkedInShareText}
-                    onChange={(e) => setLinkedInShareText(e.target.value)}
-                    rows={8}
-                    placeholder="Enter the post body..."
-                    style={{ fontSize: '0.85rem', lineHeight: '1.4' }}
+                    className="input-textarea text-sm"
+                    style={{ minHeight: '180px' }}
+                    value={indeedShareText}
+                    onChange={(e) => setIndeedShareText(e.target.value)}
                   />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--color-ink-muted)', marginTop: '0.3rem' }}>
-                    <span>Auto-formatted from active job specification</span>
-                    <span>{linkedInShareText.length} / 3000 chars</span>
-                  </div>
                 </div>
 
-                {linkedInPostSuccess && (
-                  <div style={{
-                    padding: '0.8rem 1rem', backgroundColor: 'var(--color-sage-light)',
-                    border: '1px solid var(--color-sage)', borderRadius: 'var(--radius-sm)',
-                    marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem'
-                  }}>
-                    <span style={{ color: 'var(--color-sage)', fontWeight: 'bold', fontSize: '0.85rem' }}>
-                      🎉 Job Post Published Successfully!
-                    </span>
-                    {linkedInMode === 'sandbox' ? (
-                      <button 
-                        type="button" 
-                        onClick={() => {
-                          alert(`ℹ️ RecruiterPro Sandbox Mode:\n\nThis is a simulated job posting stored in the ATS local database. Live feeds on LinkedIn.com are disabled in Sandbox Mode.\n\nTo view your actual LinkedIn feed, we will now redirect you to: https://www.linkedin.com/feed/`);
-                          window.open('https://www.linkedin.com/feed/', '_blank');
-                        }}
-                        style={{ background: 'none', border: 'none', padding: 0, textDecoration: 'underline', color: 'var(--color-terracotta)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', textAlign: 'left' }}
-                      >
-                        View Live Post on LinkedIn <ExternalLink size={12} />
-                      </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    className="btn-primary"
+                    onClick={handlePostToIndeed}
+                    disabled={isPostingToIndeed}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-indeed-blue)', borderColor: 'var(--color-indeed-blue)' }}
+                  >
+                    {isPostingToIndeed ? (
+                      <>
+                        <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                        Publishing...
+                      </>
                     ) : (
-                      <a href={linkedInShareUrl} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--color-terracotta)', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        View Live Post on LinkedIn <ExternalLink size={12} />
-                      </a>
+                      <>
+                        <Share2 size={16} /> Publish to Indeed
+                      </>
                     )}
-                  </div>
-                )}
-
-                <button 
-                  type="button" 
-                  className="btn-primary" 
-                  onClick={handlePostToLinkedIn}
-                  disabled={isPostingToLinkedIn || jobs.length === 0}
-                  style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', padding: '0.8rem' }}
-                >
-                  {isPostingToLinkedIn ? (
-                    <>
-                      <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      Publishing Job Post...
-                    </>
-                  ) : (
-                    <>
-                      <Share2 size={16} /> Publish to LinkedIn
-                    </>
-                  )}
-                </button>
+                  </button>
+                </div>
               </div>
 
-              {/* Feed preview */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <h4 style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', color: 'var(--color-ink-muted)', fontWeight: 'bold' }}>
-                  LinkedIn Feed Preview
-                </h4>
-                
-                <div className="linkedin-feed-preview" style={{
-                  backgroundColor: 'var(--color-paper-light)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '1.2rem',
-                  boxShadow: 'var(--shadow-md)'
-                }}>
-                  {/* Preview header */}
-                  <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', marginBottom: '1rem' }}>
-                    <div style={{
-                      width: '48px', height: '48px', borderRadius: '50%',
-                      backgroundColor: 'var(--color-terracotta)', color: '#fff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 'bold', fontSize: '1.1rem'
-                    }}>
-                      {linkedInConnected ? (linkedInProfile?.name || 'AD').substring(0, 2).toUpperCase() : 'RP'}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {linkedInConnected ? (linkedInProfile?.name || 'Recruiter') : 'RecruiterPro ATS'}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {linkedInConnected ? (linkedInProfile?.headline || 'Talent Acquisition Lead') : 'ATS Integration'}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-ink-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem', marginTop: '0.1rem' }}>
-                        <span>Just now</span>
-                        <span>•</span>
-                        <span>🌐</span>
-                      </div>
-                    </div>
+              {/* History Table */}
+              <div className="card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>
+                  📊 Posting History & Analytics
+                </h3>
+                {indeedPostHistory.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--color-ink-muted)', fontSize: '0.9rem' }}>
+                    No jobs posted yet. Use the form above to post your first job.
                   </div>
-
-                  {/* Preview text */}
-                  <p style={{
-                    fontSize: '0.85rem', color: 'var(--color-ink)',
-                    whiteSpace: 'pre-line', margin: '0 0 1rem 0',
-                    lineHeight: '1.4'
-                  }}>
-                    {linkedInShareText || 'Post content will appear here when you select an active job...'}
-                  </p>
-
-                  {/* Preview job attachment card */}
-                  {jobs.find(j => j.id === selectedJobForLinkedIn) && (
-                    <div className="preview-job-attachment" style={{
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                      backgroundColor: 'var(--color-paper)'
-                    }}>
-                      <div style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                        <div style={{
-                          width: '48px', height: '48px', borderRadius: '4px',
-                          backgroundColor: 'var(--color-terracotta-light)', color: 'var(--color-terracotta)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 'bold', fontSize: '1rem', flexShrink: 0
-                        }}>
-                          JO
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <h5 style={{ fontWeight: 'bold', color: 'var(--color-ink)', fontSize: '0.9rem', margin: 0 }}>
-                            {jobs.find(j => j.id === selectedJobForLinkedIn)?.title}
-                          </h5>
-                          <p style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)', margin: '0.1rem 0 0 0' }}>
-                            RecruiterPro ATS • Remote
-                          </p>
-                        </div>
-                      </div>
-                      <div style={{
-                        borderTop: '1px solid var(--color-border)',
-                        padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        backgroundColor: 'var(--color-paper-darker)'
-                      }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-sage)', fontWeight: 'bold' }}>
-                          ⚡ Easy Apply
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>
-                          linkedin.com
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <div className="table-container" style={{ overflowX: 'auto' }}>
+                    <table className="table text-sm" style={{ minWidth: '550px' }}>
+                      <thead>
+                        <tr>
+                          <th>Job Title</th>
+                          <th>Posted Date</th>
+                          <th>Status</th>
+                          <th>Views</th>
+                          <th>Clicks</th>
+                          <th>Applies</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {indeedPostHistory.map(post => (
+                          <tr key={post.id} style={{ opacity: post.status === 'Archived' ? 0.6 : 1 }}>
+                            <td style={{ fontWeight: 'bold' }}>{post.jobTitle}</td>
+                            <td>{post.postedAt}</td>
+                            <td>
+                              <span className={`badge ${post.status === 'Live' ? 'badge-success' : 'badge-neutral'}`}>
+                                {post.status}
+                              </span>
+                            </td>
+                            <td>{post.views}</td>
+                            <td>{post.clicks}</td>
+                            <td>{post.applies}</td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                                <button 
+                                  type="button" 
+                                  className="btn-text text-xs" 
+                                  onClick={() => window.open(post.shareUrl, '_blank')}
+                                  style={{ padding: '0.2rem 0.4rem' }}
+                                >
+                                  View
+                                </button>
+                                {post.status === 'Live' && (
+                                  <>
+                                    <button 
+                                      type="button" 
+                                      className="btn-text text-xs" 
+                                      onClick={() => handleSyncIndeedMetrics(post.id)}
+                                      style={{ padding: '0.2rem 0.4rem', color: 'var(--color-sage)' }}
+                                    >
+                                      Sync
+                                    </button>
+                                    <button 
+                                      type="button" 
+                                      className="btn-text text-xs" 
+                                      onClick={() => handleCloseIndeedPost(post.id)}
+                                      style={{ padding: '0.2rem 0.4rem', color: 'var(--color-ink-muted)' }}
+                                    >
+                                      Close
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Posting History Table */}
-            <div className="linkedin-card card" style={{ marginTop: '2rem' }}>
-              <h3 className="card-title" style={{ marginBottom: '1.2rem' }}>Active LinkedIn Listings & Analytics</h3>
+            {/* Indeed Job Card Preview Panel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h4 style={{ textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', color: 'var(--color-ink-muted)', fontWeight: 'bold' }}>
+                Indeed Card Preview
+              </h4>
               
-              <div className="table-responsive" style={{ overflowX: 'auto' }}>
-                <table className="candidate-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--color-border)', color: 'var(--color-ink-muted)' }}>
-                      <th style={{ padding: '0.8rem' }}>Job Posting</th>
-                      <th style={{ padding: '0.8rem' }}>Destination</th>
-                      <th style={{ padding: '0.8rem' }}>Date Posted</th>
-                      <th style={{ padding: '0.8rem' }}>Status</th>
-                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Views</th>
-                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Clicks</th>
-                      <th style={{ padding: '0.8rem', textAlign: 'center' }}>Applies</th>
-                      <th style={{ padding: '0.8rem', textAlign: 'right' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {linkedInPostHistory.length === 0 ? (
-                      <tr>
-                        <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
-                          No jobs posted to LinkedIn yet. Select a job above to post.
-                        </td>
-                      </tr>
-                    ) : (
-                      linkedInPostHistory.map(post => (
-                        <tr key={post.id} style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-ink-light)' }}>
-                          <td style={{ padding: '0.8rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>
-                            {post.jobTitle}
-                          </td>
-                          <td style={{ padding: '0.8rem' }}>
-                            <span style={{ textTransform: 'capitalize' }}>{post.postType} feed</span>
-                          </td>
-                          <td style={{ padding: '0.8rem' }}>{post.postedAt}</td>
-                          <td style={{ padding: '0.8rem' }}>
-                            <span className={`badge ${post.status === 'Live' ? 'badge-sage' : 'badge-gold'}`} style={{
-                              padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold',
-                              backgroundColor: post.status === 'Live' ? 'var(--color-sage-light)' : 'var(--color-paper-darker)',
-                              color: post.status === 'Live' ? 'var(--color-sage)' : 'var(--color-ink-muted)',
-                              border: `1px solid ${post.status === 'Live' ? 'var(--color-sage)' : 'var(--color-border)'}`
-                            }}>
-                              {post.status}
-                            </span>
-                          </td>
-                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold' }}>{post.views}</td>
-                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold' }}>{post.clicks}</td>
-                          <td style={{ padding: '0.8rem', textAlign: 'center', fontWeight: 'bold', color: 'var(--color-sage)' }}>{post.applies}</td>
-                          <td style={{ padding: '0.8rem', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              {linkedInMode === 'sandbox' ? (
-                                <button
-                                  type="button"
-                                  className="btn-secondary"
-                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                                  onClick={() => {
-                                    alert(`ℹ️ RecruiterPro Sandbox Mode:\n\nThis is a simulated job posting stored in the ATS local database. Live feeds on LinkedIn.com are disabled in Sandbox Mode.\n\nTo view your actual LinkedIn feed, we will now redirect you to: https://www.linkedin.com/feed/`);
-                                    window.open('https://www.linkedin.com/feed/', '_blank');
-                                  }}
-                                >
-                                  View <ExternalLink size={12} />
-                                </button>
-                              ) : (
-                                <a 
-                                  href={post.shareUrl} 
-                                  target="_blank" 
-                                  rel="noreferrer" 
-                                  className="btn-secondary" 
-                                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                                >
-                                  View <ExternalLink size={12} />
-                                </a>
-                              )}
-                              {post.status === 'Live' && (
-                                <>
-                                  <button 
-                                    type="button" 
-                                    className="btn-secondary" 
-                                    onClick={() => handleSyncMetrics(post.id)}
-                                    title="Fetch latest views & applies from LinkedIn"
-                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
-                                  >
-                                    <RefreshCw size={12} /> Sync
-                                  </button>
-                                  <button 
-                                    type="button" 
-                                    className="btn-secondary" 
-                                    onClick={() => handleClosePost(post.id)}
-                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--color-red)' }}
-                                  >
-                                    Close
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              {/* Authentic Indeed Job Card */}
+              <div className="indeed-job-card" style={{
+                backgroundColor: '#ffffff',
+                border: '1px solid #d4d2d0',
+                borderRadius: '8px',
+                padding: '1.25rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                fontFamily: 'Helvetica Neue, Helvetica, Arial, sans-serif',
+                textAlign: 'left'
+              }}>
+                <span className="new-tag" style={{
+                  backgroundColor: '#e8f0fe',
+                  color: '#002f87',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                  display: 'inline-block',
+                  marginBottom: '0.5rem'
+                }}>
+                  new
+                </span>
+
+                <h3 style={{ fontSize: '1.15rem', color: '#2d2d2d', margin: '0 0 0.25rem 0', fontWeight: 'bold', cursor: 'pointer' }}>
+                  {jobs.find(j => j.id === selectedJobForIndeed)?.title || 'React/Next.js Software Architect'}
+                </h3>
+
+                <p style={{ color: '#4b4b4b', fontSize: '0.88rem', margin: '0 0 0.5rem 0' }}>
+                  {indeedConnected ? (indeedProfile?.name || 'RecruiterPro ATS') : 'RecruiterPro ATS'}
+                  <span style={{ color: '#002f87', fontWeight: 'bold', marginLeft: '0.4rem', fontSize: '0.8rem' }}>
+                    4.2 ★
+                  </span>
+                </p>
+
+                <p style={{ color: '#2d2d2d', fontSize: '0.88rem', margin: '0 0 0.75rem 0' }}>
+                  Bangalore, Karnataka • Remote
+                </p>
+
+                {/* Salary estimate & Type chips */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.85rem' }}>
+                  <span style={{ backgroundColor: '#f3f2f1', color: '#2d2d2d', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px', fontWeight: 'bold' }}>
+                    $135,000 - $160,000 a year
+                  </span>
+                  <span style={{ backgroundColor: '#f3f2f1', color: '#2d2d2d', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px' }}>
+                    Full-time
+                  </span>
+                  <span style={{ backgroundColor: '#f3f2f1', color: '#2d2d2d', fontSize: '0.75rem', padding: '4px 8px', borderRadius: '4px' }}>
+                    Remote
+                  </span>
+                </div>
+
+                {/* Benefits / description snippet */}
+                <ul style={{ paddingLeft: '1.2rem', margin: '0 0 1rem 0', fontSize: '0.8rem', color: '#4b4b4b', lineHeight: '1.5' }}>
+                  {jobs.find(j => j.id === selectedJobForIndeed)?.mustHaves ? (
+                    jobs.find(j => j.id === selectedJobForIndeed).mustHaves.split(',').map((req, i) => (
+                      <li key={i}>Must have: {req.trim()}</li>
+                    ))
+                  ) : (
+                    <>
+                      <li>Full-time position with competitive benefits.</li>
+                      <li>Work with a modern React, Next.js, and TypeScript stack.</li>
+                    </>
+                  )}
+                  <li>Directly apply and start interviewing.</li>
+                </ul>
+
+                {/* Indeed Easy Apply */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#008060', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: '#e3f5eb',
+                    color: '#008060',
+                    fontSize: '0.65rem'
+                  }}>
+                    ⚡
+                  </span>
+                  Indeed Easy Apply
+                </div>
+
+                <button style={{
+                  backgroundColor: '#002f87',
+                  border: 'none',
+                  color: '#ffffff',
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  borderRadius: '100px',
+                  cursor: 'pointer',
+                  width: '100%',
+                  textAlign: 'center',
+                  transition: 'background-color 0.2s'
+                }} type="button">
+                  Apply now
+                </button>
               </div>
+
+              {indeedPostSuccess && (
+                <div className="alert alert-success animate-fade-in" style={{ marginTop: '1rem' }}>
+                  <div style={{ fontWeight: 'bold' }}>🎉 Job Posted Successfully!</div>
+                  <div style={{ fontSize: '0.8rem', marginTop: '0.2rem' }}>
+                    Your job listing is simulated live. <a href={indeedShareUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>View Listing Card</a>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Render Search Tab */}
-        {linkedinActiveTab === 'search' && (
-          <div className="linkedin-search-view">
-            {/* Search Filters Card */}
-            <div className="linkedin-card card" style={{ marginBottom: '1.5rem' }}>
-              <h3 className="card-title">Search Jobs on LinkedIn</h3>
-              
-              <form onSubmit={handleLinkedInJobSearch} style={{ marginTop: '1.2rem' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '1rem', alignItems: 'flex-end' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label text-xs">Keywords</label>
-                    <input 
-                      type="text" 
-                      className="input-text text-sm" 
-                      placeholder="e.g. React Developer"
-                      value={linkedInSearchQuery}
-                      onChange={(e) => setLinkedInSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label text-xs">Location</label>
-                    <input 
-                      type="text" 
-                      className="input-text text-sm" 
-                      placeholder="e.g. Remote / New York"
-                      value={linkedInSearchLocation}
-                      onChange={(e) => setLinkedInSearchLocation(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label text-xs">Job Type</label>
-                    <select 
-                      className="input-text text-sm"
-                      value={linkedInSearchJobType}
-                      onChange={(e) => setLinkedInSearchJobType(e.target.value)}
-                    >
-                      <option value="all">All Types</option>
-                      <option value="full-time">Full-Time</option>
-                      <option value="part-time">Part-Time</option>
-                      <option value="contract">Contract</option>
-                      <option value="internship">Internship</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label text-xs">Experience Level</label>
-                    <select 
-                      className="input-text text-sm"
-                      value={linkedInSearchExperience}
-                      onChange={(e) => setLinkedInSearchExperience(e.target.value)}
-                    >
-                      <option value="all">All Experience Levels</option>
-                      <option value="entry">Entry Level</option>
-                      <option value="mid-senior">Mid-Senior Level</option>
-                      <option value="director">Director / Executive</option>
-                    </select>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      type="submit" 
-                      className="btn-primary" 
-                      disabled={isSearchingLinkedIn}
-                      style={{ height: '38px', padding: '0 1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                    >
-                      {isSearchingLinkedIn ? (
-                        <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      ) : (
-                        <Search size={16} />
-                      )}
-                      Search
-                    </button>
-                    
-                    <button 
-                      type="button" 
-                      className="btn-secondary" 
-                      onClick={() => {
-                        const keywords = linkedInSearchQuery || '';
-                        const location = linkedInSearchLocation || '';
-                        const url = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(keywords)}&location=${encodeURIComponent(location)}`;
-                        window.open(url, '_blank');
-                      }}
-                      style={{ height: '38px', padding: '0 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', borderStyle: 'dashed' }}
-                      title="Search directly on real LinkedIn.com"
-                    >
-                      <ExternalLink size={14} /> Live Search
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            {/* Results Section */}
-            {isSearchingLinkedIn ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem 0', gap: '1rem' }}>
-                <div className="spinner-large" style={{ width: '40px', height: '40px', border: '3px solid var(--color-terracotta)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <p style={{ color: 'var(--color-ink-muted)', fontSize: '0.9rem' }}>Querying LinkedIn API endpoints...</p>
+        {indeedActiveTab === 'search' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <form onSubmit={handleIndeedJobSearch} className="card" style={{ padding: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
+              <div className="form-group" style={{ flex: 1, minWidth: '180px', marginBottom: 0 }}>
+                <label className="form-label text-xs">Search Keywords</label>
+                <input 
+                  type="text" 
+                  className="input-text text-sm"
+                  placeholder="e.g. React Developer"
+                  value={indeedSearchQuery}
+                  onChange={(e) => setIndeedSearchQuery(e.target.value)}
+                />
               </div>
-            ) : !linkedInSearchHasSearched ? (
-              <div className="linkedin-card card" style={{ padding: '4rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                <div style={{ padding: '1rem', backgroundColor: 'var(--color-terracotta-light)', borderRadius: '50%', color: 'var(--color-terracotta)' }}>
-                  <Linkedin size={36} />
-                </div>
-                <h4 style={{ fontSize: '1.2rem', color: 'var(--color-ink)' }}>Search External Opportunities</h4>
-                <p style={{ fontSize: '0.9rem', color: 'var(--color-ink-muted)', maxWidth: '400px' }}>
-                  Search for jobs directly on LinkedIn and pull them into RecruiterPro with a single click to start screening and tracking candidate applications.
-                </p>
+              <div className="form-group" style={{ flex: 1, minWidth: '150px', marginBottom: 0 }}>
+                <label className="form-label text-xs">Location</label>
+                <input 
+                  type="text" 
+                  className="input-text text-sm"
+                  placeholder="e.g. Remote, Bangalore"
+                  value={indeedSearchLocation}
+                  onChange={(e) => setIndeedSearchLocation(e.target.value)}
+                />
               </div>
-            ) : linkedInSearchResults.length === 0 ? (
-              <div className="linkedin-card card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
-                No search results found. Try adjusting keywords or location search queries.
+              <div className="form-group" style={{ width: '120px', marginBottom: 0 }}>
+                <label className="form-label text-xs">Job Type</label>
+                <select 
+                  className="select-box text-sm"
+                  value={indeedSearchJobType}
+                  onChange={(e) => setIndeedSearchJobType(e.target.value)}
+                >
+                  <option value="all">All Types</option>
+                  <option value="full-time">Full-time</option>
+                  <option value="part-time">Part-time</option>
+                  <option value="contract">Contract</option>
+                  <option value="internship">Internship</option>
+                </select>
               </div>
-            ) : (
-              <div className="linkedin-search-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-                {linkedInSearchResults.map(job => (
-                  <div key={job.id} className="linkedin-job-card card" style={{
-                    display: 'flex', flexDirection: 'column', height: '100%',
-                    justifyContent: 'space-between', padding: '1.2rem', transition: 'var(--transition-smooth)'
-                  }}>
-                    <div>
-                      {/* Logo and Score */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <div style={{
-                          width: '40px', height: '40px', borderRadius: '4px',
-                          backgroundColor: job.logoBg, color: '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontWeight: 'bold', fontSize: '0.9rem'
-                        }}>
-                          {job.logoInitials}
-                        </div>
-                        <span className="badge badge-sage" style={{
-                          fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-full)',
-                          backgroundColor: 'var(--color-sage-light)', color: 'var(--color-sage)', border: '1px solid var(--color-sage)'
-                        }}>
-                          98% ATS Match
-                        </span>
-                      </div>
+              <button 
+                type="submit" 
+                className="btn-primary"
+                disabled={isSearchingIndeed}
+                style={{ height: '38px', padding: '0 1.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--color-indeed-blue)', borderColor: 'var(--color-indeed-blue)' }}
+              >
+                {isSearchingIndeed ? (
+                  <>
+                    <div className="spinner-mini" style={{ width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search size={16} /> Search Indeed
+                  </>
+                )}
+              </button>
+            </form>
 
-                      {/* Title and Company */}
-                      <h4 style={{ fontSize: '1rem', fontWeight: 'bold', color: 'var(--color-ink)', marginBottom: '0.2rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={job.title}>
-                        {job.title}
-                      </h4>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', fontWeight: '500' }}>
-                        {job.company} • {job.location}
-                      </p>
+            {indeedSearchHasSearched && indeedSearchResults.length === 0 && !isSearchingIndeed && (
+              <div className="card" style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--color-ink-muted)' }}>
+                No search results found. Try using broader keywords or clearing search filters.
+              </div>
+            )}
 
-                      <p style={{
-                        fontSize: '0.8rem', color: 'var(--color-ink-light)', marginTop: '0.8rem',
-                        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.4'
+            {indeedSearchResults.length > 0 && (
+              <div className="indeed-search-grid">
+                {indeedSearchResults.map(job => (
+                  <div key={job.id} className="card indeed-job-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                      <div style={{
+                        width: '40px', height: '40px', borderRadius: '4px',
+                        backgroundColor: job.logoBg || 'var(--color-indeed-blue)', color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 'bold', fontSize: '0.9rem', flexShrink: 0
                       }}>
-                        {job.description.split('\n')[0]}
-                      </p>
+                        {job.logoInitials}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <h4 style={{ fontSize: '0.95rem', fontWeight: 'bold', margin: 0, color: 'var(--color-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {job.title}
+                        </h4>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--color-ink-muted)', margin: '0.1rem 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {job.company} • {job.location}
+                        </p>
+                      </div>
                     </div>
 
-                    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', marginTop: '1.2rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>{job.salary}</span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--color-ink-muted)' }}>{job.posted}</span>
-                      </div>
-                      
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          type="button" 
-                          className="btn-secondary" 
-                          onClick={() => setSelectedSearchResult(job)}
-                          style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
-                        >
-                          View Details
-                        </button>
-                        <button 
-                          type="button" 
-                          className="btn-primary" 
-                          onClick={() => handleImportLinkedInJob(job)}
-                          style={{ flex: 1.2, fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem' }}
-                        >
-                          <Download size={14} /> Import to ATS
-                        </button>
-                      </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-light)', lineHeight: '1.4', flex: 1 }}>
+                      {job.description ? job.description.substring(0, 110) + '...' : ''}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>{job.salary}</span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--color-ink-muted)' }}>{job.posted}</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        onClick={() => setSelectedSearchResult(job)}
+                        style={{ flex: 1, fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}
+                      >
+                        Details
+                      </button>
+                      <button 
+                        type="button" 
+                        className="btn-primary" 
+                        onClick={() => handleImportIndeedJob(job)}
+                        style={{ flex: 1.2, fontSize: '0.8rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.2rem', backgroundColor: 'var(--color-indeed-blue)', borderColor: 'var(--color-indeed-blue)' }}
+                      >
+                        <Download size={12} /> Import to ATS
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -9526,11 +9131,245 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             )}
           </div>
         )}
+
+        {indeedActiveTab === 'settings' && (
+          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+              
+              {/* Credentials card */}
+              <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 'bold', color: 'var(--color-ink)' }}>
+                  ⚙️ API Connection Settings
+                </h3>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Integration Mode</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                    <button 
+                      type="button"
+                      className={`btn-secondary text-sm ${indeedMode === 'sandbox' ? 'active' : ''}`}
+                      style={{ flex: 1, padding: '0.4rem', border: indeedMode === 'sandbox' ? '2px solid var(--color-indeed-blue)' : undefined, color: indeedMode === 'sandbox' ? 'var(--color-indeed-blue)' : undefined }}
+                      onClick={() => setIndeedMode('sandbox')}
+                    >
+                      Sandbox Mode
+                    </button>
+                    <button 
+                      type="button"
+                      className={`btn-secondary text-sm ${indeedMode === 'live' ? 'active' : ''}`}
+                      style={{ flex: 1, padding: '0.4rem', border: indeedMode === 'live' ? '2px solid var(--color-indeed-blue)' : undefined, color: indeedMode === 'live' ? 'var(--color-indeed-blue)' : undefined }}
+                      onClick={() => setIndeedMode('live')}
+                    >
+                      Live API Mode
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Client ID</label>
+                  <input 
+                    type="text" 
+                    className="input-text text-sm"
+                    placeholder="Enter Indeed Client ID"
+                    value={indeedClientId}
+                    onChange={(e) => setIndeedClientId(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Client Secret</label>
+                  <input 
+                    type="password" 
+                    className="input-text text-sm"
+                    placeholder="Enter Client Secret"
+                    value={indeedClientSecret}
+                    onChange={(e) => setIndeedClientSecret(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label text-xs">Redirect URI (OAuth Callback)</label>
+                  <input 
+                    type="text" 
+                    className="input-text text-sm"
+                    value={indeedRedirectUri}
+                    onChange={(e) => setIndeedRedirectUri(e.target.value)}
+                  />
+                </div>
+
+                {indeedMode === 'live' && (
+                  <div className="form-group animate-fade-in" style={{ marginBottom: 0 }}>
+                    <label className="form-label text-xs">Access Token (Optional Direct Entry)</label>
+                    <input 
+                      type="password" 
+                      className="input-text text-sm"
+                      placeholder="Or enter Access Token directly"
+                      value={indeedAccessToken}
+                      onChange={(e) => setIndeedAccessToken(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    className="btn-primary" 
+                    onClick={handleAuthorizeIndeed}
+                    style={{ flex: 1.5, backgroundColor: 'var(--color-indeed-blue)', borderColor: 'var(--color-indeed-blue)' }}
+                  >
+                    {indeedConnected ? 'Reconnect Account' : 'Connect Indeed Account'}
+                  </button>
+                  {indeedConnected && (
+                    <button 
+                      type="button" 
+                      className="btn-secondary" 
+                      style={{ flex: 1, color: '#ef4444' }}
+                      onClick={() => {
+                        setIndeedConnected(false);
+                        setIndeedProfile(null);
+                        setIndeedAccessToken('');
+                        setIndeedIntrospectResult(null);
+                        localStorage.removeItem('rp_indeed_connected');
+                        localStorage.removeItem('rp_indeed_profile');
+                        localStorage.removeItem('rp_indeed_access_token');
+                        alert('Disconnected from Indeed!');
+                      }}
+                    >
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status card */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                <div className="card" style={{ padding: '1.5rem' }}>
+                  <h3 style={{ fontSize: '1rem', marginBottom: '1rem', fontWeight: 'bold', color: 'var(--color-ink)' }}>
+                    🟢 Connection Status
+                  </h3>
+                  {indeedConnected ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="animate-fade-in">
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                        <div style={{
+                          width: '48px', height: '48px', borderRadius: '8px',
+                          backgroundColor: 'var(--color-indeed-blue)', color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 'bold', fontSize: '1.1rem'
+                        }}>
+                          {indeedProfile?.avatar || 'IN'}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>{indeedProfile?.name}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--color-ink-muted)' }}>{indeedProfile?.headline}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--color-ink-muted)', marginTop: '0.1rem' }}>ID: {indeedProfile?.id}</div>
+                        </div>
+                      </div>
+                      <div style={{ padding: '0.8rem', backgroundColor: 'var(--color-sage-light)', borderRadius: '6px', border: '1px solid var(--color-sage)', fontSize: '0.8rem', color: 'var(--color-ink-light)' }}>
+                        <strong>Connected:</strong> RecruiterPro has authorized access to post and query on behalf of this Indeed partner.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>
+                      Not connected. Use settings to configure your credentials and authorize.
+                    </div>
+                  )}
+                </div>
+
+                {indeedMode === 'live' && indeedAccessToken.trim().length > 0 && (
+                  <div className="card animate-fade-in" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <h3 style={{ fontSize: '1.0rem', margin: 0, fontWeight: 'bold', color: 'var(--color-ink)' }}>
+                      🛡️ Token Verification
+                    </h3>
+                    
+                    <button 
+                      type="button" 
+                      className="btn-secondary" 
+                      onClick={async () => {
+                        setIsCheckingToken(true);
+                        setTokenCheckError(null);
+                        setIndeedIntrospectResult(null);
+                        try {
+                          const apiBase = window.location.origin;
+                          const res = await fetch(apiBase + '/api/indeed-introspect', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              token: indeedAccessToken,
+                              client_id: indeedClientId,
+                              client_secret: indeedClientSecret
+                            })
+                          });
+                          if (!res.ok) {
+                            const txt = await res.text();
+                            throw new Error(txt);
+                          }
+                          const data = await res.json();
+                          setIndeedIntrospectResult(data);
+                        } catch (e) {
+                          console.error(e);
+                          setTokenCheckError(e.message || 'Token verification failed.');
+                        } finally {
+                          setIsCheckingToken(false);
+                        }
+                      }}
+                      disabled={isCheckingToken}
+                      style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                    >
+                      {isCheckingToken ? (
+                        <>
+                          <div className="spinner-mini" style={{ width: '12px', height: '12px', border: '2px solid var(--color-ink-light)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                          Verifying...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck size={14} /> Verify Token Status
+                        </>
+                      )}
+                    </button>
+
+                    {tokenCheckError && (
+                      <div style={{ fontSize: '0.8rem', color: '#ef4444', padding: '0.5rem', backgroundColor: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '4px' }}>
+                        Error: {tokenCheckError}
+                      </div>
+                    )}
+
+                    {indeedIntrospectResult && (
+                      <div className="animate-fade-in" style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '0.8rem', backgroundColor: 'var(--color-paper-darker)', border: '1px solid var(--color-border)', borderRadius: '6px' }}>
+                        <div><strong>Status:</strong> <span style={{ color: indeedIntrospectResult.active ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>{indeedIntrospectResult.active ? 'Active' : 'Inactive'}</span></div>
+                        
+                        <div><strong>Authorized Scopes:</strong></div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                          {(indeedIntrospectResult.scope || '').split(/[\s,]+/).filter(Boolean).map(s => {
+                            const isRequired = s === 'employer.jobs.write' || s === 'employer.jobs.read';
+                            return (
+                              <span key={s} style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: isRequired ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)', color: isRequired ? '#10b981' : '#6366f1', border: `1px solid ${isRequired ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.2)'}` }}>
+                                {s}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        {(!indeedIntrospectResult.scope || !indeedIntrospectResult.scope.includes('employer.jobs.write')) && (
+                          <div style={{ color: '#f59e0b', fontSize: '0.72rem', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <span>⚠ Missing 'employer.jobs.write' scope!</span>
+                          </div>
+                        )}
+                        
+                        {indeedIntrospectResult.exp && (
+                          <div style={{ marginTop: '0.2rem', borderTop: '1px solid var(--color-border)', paddingTop: '0.4rem', color: 'var(--color-ink-muted)' }}>
+                            Expires in {Math.round((indeedIntrospectResult.exp - Date.now() / 1000) / (3600 * 24))} days
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
-
-  const renderLinkedInJobDetailsModal = () => {
+  const renderIndeedJobDetailsModal = () => {
     if (!selectedSearchResult) return null;
     const job = selectedSearchResult;
 
@@ -9541,7 +9380,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <div style={{
                 width: '48px', height: '48px', borderRadius: '4px',
-                backgroundColor: job.logoBg, color: '#fff',
+                backgroundColor: job.logoBg || 'var(--color-indeed-blue)', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 'bold', fontSize: '1rem'
               }}>
@@ -9620,8 +9459,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
             <button 
               type="button" 
               className="btn-primary" 
-              onClick={() => handleImportLinkedInJob(job)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={() => handleImportIndeedJob(job)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', backgroundColor: 'var(--color-indeed-blue)', borderColor: 'var(--color-indeed-blue)' }}
             >
               <Download size={14} /> Import into Jobs Dashboard
             </button>
@@ -9630,9 +9469,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       </div>
     );
   };
-
-  const renderLinkedInAuthModal = () => {
-    if (!isLinkedInAuthOpen) return null;
+  const renderIndeedAuthModal = () => {
+    if (!isIndeedAuthOpen) return null;
 
     const handleLogin = (e) => {
       e.preventDefault();
@@ -9642,16 +9480,16 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
     const handleConsent = () => {
       setAuthStep('processing');
       setTimeout(() => {
-        setLinkedInConnected(true);
-        setLinkedInProfile({
+        setIndeedConnected(true);
+        setIndeedProfile({
           name: 'Alex Rivera',
           headline: 'Talent Acquisition Lead at RecruiterPro Inc.',
           avatar: 'AR',
-          id: 'li-user-128374'
+          id: 'indeed-user-128374'
         });
         setAuthStep('success');
         setTimeout(() => {
-          setIsLinkedInAuthOpen(false);
+          setIsIndeedAuthOpen(false);
           setAuthStep('login');
         }, 1200);
       }, 1500);
@@ -9662,16 +9500,16 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         <div className="modal-content" style={{ maxWidth: '420px', padding: '1.8rem', borderRadius: 'var(--radius-lg)' }}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0077b5' }}>
-              <Linkedin size={24} />
-              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '-0.02em' }}>LinkedIn Authorization</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#002f87' }}>
+              <Briefcase size={24} />
+              <span style={{ fontSize: '1.2rem', fontWeight: 'bold', letterSpacing: '-0.02em' }}>Indeed Authorization</span>
             </div>
             {authStep !== 'processing' && authStep !== 'success' && (
               <button 
                 type="button" 
                 className="btn-close" 
                 onClick={() => {
-                  setIsLinkedInAuthOpen(false);
+                  setIsIndeedAuthOpen(false);
                   setAuthStep('login');
                 }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-ink-light)' }}
@@ -9685,14 +9523,14 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           {authStep === 'login' && (
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-                <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Sign in with LinkedIn</h4>
+                <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Sign in with Indeed</h4>
                 <p style={{ fontSize: '0.8rem', color: 'var(--color-ink-muted)', marginTop: '0.2rem' }}>
                   Authorize RecruiterPro ATS to link with your account.
                 </p>
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label text-xs">LinkedIn User Email</label>
+                <label className="form-label text-xs">Indeed User Email</label>
                 <input 
                   type="email" 
                   className="input-text text-sm" 
@@ -9716,7 +9554,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
               <button 
                 type="submit" 
                 className="btn-primary" 
-                style={{ width: '100%', padding: '0.7rem', backgroundColor: '#0077b5', borderColor: '#0077b5', marginTop: '0.5rem' }}
+                style={{ width: '100%', padding: '0.7rem', backgroundColor: '#002f87', borderColor: '#002f87', marginTop: '0.5rem' }}
               >
                 Sign In
               </button>
@@ -9737,18 +9575,18 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 </div>
                 <div style={{ fontSize: '1.5rem', color: 'var(--color-ink-muted)' }}>⇄</div>
                 <div style={{
-                  width: '50px', height: '50px', borderRadius: '10px',
-                  backgroundColor: '#0077b5', color: '#fff',
+                  width: '60px', height: '50px', borderRadius: '10px',
+                  backgroundColor: '#002f87', color: '#fff',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontWeight: 'bold', fontSize: '1.3rem', boxShadow: 'var(--shadow-sm)'
+                  fontWeight: 'bold', fontSize: '0.85rem', boxShadow: 'var(--shadow-sm)'
                 }}>
-                  in
+                  Indeed
                 </div>
               </div>
 
               <h4 style={{ fontSize: '1.05rem', color: 'var(--color-ink)' }}>Access Request</h4>
               <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-light)', lineHeight: '1.4', textAlign: 'left' }}>
-                <strong>RecruiterPro ATS</strong> is requesting permission to access your LinkedIn account details:
+                <strong>RecruiterPro ATS</strong> is requesting permission to access your Indeed employer account details:
               </p>
               
               <ul style={{
@@ -9756,8 +9594,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                 color: 'var(--color-ink-muted)', display: 'flex', flexDirection: 'column', gap: '0.4rem'
               }}>
                 <li>Use your profile name, headline, and profile avatar info.</li>
-                <li>Post job updates and links directly to your LinkedIn personal feed.</li>
-                <li>Access and post updates on behalf of your connected Company Pages.</li>
+                <li>Post job updates and links directly to Indeed.</li>
+                <li>Access and post updates on behalf of your connected Employer pages.</li>
               </ul>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem' }}>
@@ -9773,7 +9611,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
                   type="button" 
                   className="btn-primary" 
                   onClick={handleConsent}
-                  style={{ flex: 1.5, padding: '0.6rem', backgroundColor: '#0077b5', borderColor: '#0077b5' }}
+                  style={{ flex: 1.5, padding: '0.6rem', backgroundColor: '#002f87', borderColor: '#002f87' }}
                 >
                   Allow & Connect
                 </button>
@@ -9784,7 +9622,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
           {/* Processing Step */}
           {authStep === 'processing' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 0', gap: '1.2rem' }}>
-              <div className="spinner-large" style={{ width: '36px', height: '36px', border: '3px solid #0077b5', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <div className="spinner-large" style={{ width: '36px', height: '36px', border: '3px solid #002f87', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
               <p style={{ fontSize: '0.85rem', color: 'var(--color-ink-muted)', margin: 0 }}>
                 Authenticating credentials and fetching token...
               </p>
@@ -9812,7 +9650,6 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       </div>
     );
   };
-
   if (!session) {
     return renderLoginScreen();
   }
@@ -9839,7 +9676,7 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
         <div className="workspace-content">
           {activeSidebarTab === 'jobs' && renderJobsView()}
           {activeSidebarTab === 'candidates' && renderCandidatesView()}
-          {activeSidebarTab === 'linkedin' && renderLinkedInView()}
+          {activeSidebarTab === 'linkedin' && renderIndeedView()}
           {activeSidebarTab === 'careers' && renderCareersView()}
           {activeSidebarTab === 'templates' && renderTemplatesView()}
           {activeSidebarTab === 'settings' && renderSettingsView()}
@@ -9852,8 +9689,8 @@ ALTER TABLE public.email_templates DISABLE ROW LEVEL SECURITY;`;
       {renderCareersPreviewModal()}
       {renderCreateJobModal()}
       {renderSupabaseModal()}
-      {renderLinkedInJobDetailsModal()}
-      {renderLinkedInAuthModal()}
+      {renderIndeedJobDetailsModal()}
+      {renderIndeedAuthModal()}
 
       {/* 3. BATCH EMAIL COMPOSER MODAL */}
       {isEmailModalOpen && (

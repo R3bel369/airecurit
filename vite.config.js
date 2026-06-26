@@ -8,10 +8,10 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      '/linkedin-api': {
-        target: 'https://api.linkedin.com',
+      '/indeed-api': {
+        target: 'https://api.indeed.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/linkedin-api/, '')
+        rewrite: (path) => path.replace(/^\/indeed-api/, '')
       }
     }
   }
